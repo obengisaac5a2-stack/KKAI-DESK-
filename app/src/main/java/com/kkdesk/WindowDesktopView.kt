@@ -248,7 +248,7 @@ internal class WindowDesktopView(context: Context) : FrameLayout(context) {
             "Browser" -> {
                 val address = EditText(context).apply {
                     hint = "Enter a website or search"
-                    singleLine = true
+                    setSingleLine(true)
                     setTextColor(Color.WHITE)
                     setHintTextColor(Color.LTGRAY)
                     setBackground(bg(Color.rgb(38, 55, 74), 8))
