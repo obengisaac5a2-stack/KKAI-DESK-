@@ -15,38 +15,89 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # The Arena desktop ZIP is kept as a source artifact in the repository.
-      # When present, build its React/Vite desktop and install the production
-      # assets into the existing Android Presentation WebView asset directory.
-      - name: Unpack Arena desktop source
-        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
+      - name: Unpack the latest supplied KK DEX desktop source
         run: |
+          ZIP_FILE="kk-dex-desktop-os-development (1).zip"
+          test -s "$ZIP_FILE"
           mkdir -p desktop-source
-          unzip -q kk-dex-desktop-os-development.zip -d desktop-source
+          unzip -q "$ZIP_FILE" -d desktop-source
 
       - name: Set up Node.js
-        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: desktop-source/package-lock.json
 
-      - name: Build KK DEX desktop from Arena source
-        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
+      - name: Build the supplied desktop and phone-controller interfaces
         run: |
           cd desktop-source
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("vite.config.ts")
+          s = p.read_text()
+          if "base:" not in s:
+              s = s.replace("export default defineConfig({", 'export default defineConfig({\n  base: "./",')
+          p.write_text(s)
+          PY
           npm ci
           npx tsc --noEmit
           npm run build
           test -s dist/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("dist/index.html")
+          s = p.read_text()
+          bridge = r"""
+          <script>
+          (() => {
+            const channels = new Map();
+            class KKDexNativeBroadcastChannel {
+              constructor(name) {
+                this.name = name;
+                this.onmessage = null;
+                this.listeners = new Set();
+                if (!channels.has(name)) channels.set(name, new Set());
+                channels.get(name).add(this);
+              }
+              postMessage(data) {
+                try {
+                  window.KKDexHost?.postMessage(this.name, JSON.stringify(data));
+                } catch (error) { console.error("KK DEX native channel error", error); }
+              }
+              addEventListener(type, listener) { if (type === "message") this.listeners.add(listener); }
+              removeEventListener(type, listener) { if (type === "message") this.listeners.delete(listener); }
+              close() { channels.get(this.name)?.delete(this); }
+              start() {}
+            }
+            window.BroadcastChannel = KKDexNativeBroadcastChannel;
+            window.__KKDEX_NATIVE_BROADCAST = (name, json) => {
+              let data;
+              try { data = JSON.parse(json); } catch (_) { return; }
+              for (const channel of channels.get(name) || []) {
+                const event = { data };
+                try { channel.onmessage?.(event); } catch (error) { console.error(error); }
+                for (const listener of channel.listeners) {
+                  try { listener.call(channel, event); } catch (error) { console.error(error); }
+                }
+              }
+            };
+          })();
+          </script>
+          """
+          if "__KKDEX_NATIVE_BROADCAST" not in s:
+              s = s.replace("<head>", "<head>" + bridge, 1)
+          p.write_text(s)
+          PY
           mkdir -p ../app/src/main/assets/kkdex
+          rm -rf ../app/src/main/assets/kkdex/*
           cp -R dist/. ../app/src/main/assets/kkdex/
 
-      - name: Verify desktop asset
+      - name: Verify bundled interfaces
         run: |
           test -s app/src/main/assets/kkdex/index.html
-          echo "KK DEX desktop asset is present."
+          grep -q "__KKDEX_NATIVE_BROADCAST" app/src/main/assets/kkdex/index.html
+          echo "Supplied KK DEX interface and native phone-to-TV bridge are bundled."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
