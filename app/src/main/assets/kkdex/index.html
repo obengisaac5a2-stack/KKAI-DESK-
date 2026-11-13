@@ -3888,6 +3888,13 @@ const KKDex = {
                 this.currentPath = 'Home';
                 this.renderFiles(body);
 
+                // Android calls this only after the user has selected a folder.
+                window.addEventListener('kkdex-storage-ready', () => {
+                    if (body.isConnected && (this.currentPath === 'Phone storage' || this.currentPath.startsWith('Phone storage/'))) {
+                        this.loadPhoneStorage(body);
+                    }
+                });
+
                 // Sidebar navigation
                 body.querySelectorAll('.files-sidebar-item[data-path]').forEach(item => {
                     item.addEventListener('click', () => {
@@ -3916,15 +3923,17 @@ const KKDex = {
                     this.renderFiles(body);
                 });
 
-                // Android phone storage: choose a folder, then list its real contents.
+                // Android phone storage: wait for the native picker result before listing files.
                 body.querySelector('#files-phone-storage')?.addEventListener('click', () => {
                     const host = window.KKDexHost;
                     if (!host) { alert('Android storage is available in the installed KK DEX app.'); return; }
+                    this.currentPath = 'Phone storage';
+                    this.phoneStorageFiles = [];
+                    this.renderFiles(body);
+                    const content = body.querySelector('#files-content-area');
+                    if (content) content.innerHTML = '<div style="padding:24px;color:var(--text-secondary);">Choose a folder on your phone to connect storage…</div>';
                     const connect = host.requestStorageAccess();
-                    if (connect) {
-                        this.currentPath = 'Phone storage';
-                        setTimeout(() => this.loadPhoneStorage(body), 900);
-                    }
+                    if (!connect && content) content.innerHTML = '<div style="padding:24px;color:var(--text-secondary);">Android could not open the folder picker. Please try again.</div>';
                 });
 
                 // Search
@@ -3956,14 +3965,14 @@ const KKDex = {
                 if (this.viewMode === 'grid') {
                     content.innerHTML = `<div class="files-grid active">${files.map(f => `
                         <div class="file-item" data-name="${f.name}" data-type="${f.type}">
-                            <div class="fi-icon">${f.icon}</div>
+                            <div class="fi-icon">${f.icon || (f.type === 'folder' ? '📁' : '📄')}</div>
                             <div class="fi-name">${f.name}</div>
                         </div>
                     `).join('')}</div>`;
                 } else {
                     content.innerHTML = `<div class="files-list active">${files.map(f => `
                         <div class="files-list-item" data-name="${f.name}" data-type="${f.type}">
-                            <div class="fli-icon">${f.icon}</div>
+                            <div class="fli-icon">${f.icon || (f.type === 'folder' ? '📁' : '📄')}</div>
                             <div class="fli-name">${f.name}</div>
                             <div class="fli-size">${f.size || '--'}</div>
                             <div class="fli-date">Today</div>
