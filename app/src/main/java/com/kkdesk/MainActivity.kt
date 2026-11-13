@@ -220,7 +220,7 @@ private class DesktopPresentation(
     display: Display,
     private val onLaunchApp: (String) -> Unit
 ) : Presentation(context, display) {
-    private var desktopView: DesktopView? = null
+    private var desktopView: DesktopShellView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
