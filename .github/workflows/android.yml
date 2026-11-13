@@ -524,6 +524,70 @@ jobs:
                     closeBrowser()
                     bridge.detachDesktop(webView)''', "TV native playback and browser overlays")
 
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''                    val browser = WebView(context).apply {
+                        setBackgroundColor(Color.BLACK)
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        webChromeClient = WebChromeClient()
+                        webViewClient = WebViewClient()
+                    }''',
+          '''                    val browser = WebView(context).apply {
+                        setBackgroundColor(Color.BLACK)
+                        isFocusable = true
+                        isFocusableInTouchMode = true
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        settings.setSupportMultipleWindows(true)
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        android.webkit.CookieManager.getInstance().setAcceptCookie(true)
+                        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onCreateWindow(
+                                view: WebView?,
+                                isDialog: Boolean,
+                                isUserGesture: Boolean,
+                                resultMsg: android.os.Message?,
+                            ): Boolean {
+                                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                                val popup = WebView(context).apply {
+                                    settings.javaScriptEnabled = true
+                                    settings.domStorageEnabled = true
+                                    webViewClient = object : WebViewClient() {
+                                        override fun onPageStarted(
+                                            view: WebView,
+                                            url: String,
+                                            favicon: android.graphics.Bitmap?,
+                                        ) {
+                                            if (url.startsWith("https://") || url.startsWith("http://")) {
+                                                browser.loadUrl(url)
+                                                view.post { view.stopLoading(); view.destroy() }
+                                            }
+                                        }
+                                    }
+                                }
+                                transport.webView = popup
+                                resultMsg.sendToTarget()
+                                return true
+                            }
+                        }
+                        webViewClient = WebViewClient()
+                    }''', "TV browser cookies, keyboard focus and popup navigation")
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''                    browserView = browser
+                    browser.loadUrl(url)''',
+          '''                    browserView = browser
+                    browser.loadUrl(url)
+                    browser.requestFocus(android.view.View.FOCUS_DOWN)''', "TV browser receives keyboard and remote focus")
+
           patch("android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt",
           '''            "openUrl" -> openUrl(args.optString("url"))
                     "getInstalledApps" -> installedApps.installedApps()''',
@@ -560,14 +624,17 @@ jobs:
           if 'versionCode = 2' in build and 'versionName = "1.0.1"' in build:
               build = build.replace("versionCode = 2", "versionCode = 3", 1).replace('versionName = "1.0.1"', 'versionName = "1.0.2"', 1)
               gradle.write_text(build)
-          elif not ('versionCode = 3' in build and 'versionName = "1.0.2"' in build):
+          elif 'versionCode = 3' in build and 'versionName = "1.0.2"' in build:
+              build = build.replace("versionCode = 3", "versionCode = 4", 1).replace('versionName = "1.0.2"', 'versionName = "1.0.3"', 1)
+              gradle.write_text(build)
+          elif not ('versionCode = 4' in build and 'versionName = "1.0.3"' in build):
               raise SystemExit("Unexpected Development 7 version; refusing to bump a different source.")
 
           required = {
               "src/apps/AndroidApps.tsx": ["playVideoOnDesktop", "Install APK", "installApk"],
               "src/apps/Connected.tsx": ["YouTube", "nativeAvailable()"],
               "src/Panels.tsx": ["openWifiSettings", "openBluetoothSettings"],
-              "android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt": ["fun playVideo", "fun openBrowser", "VideoView"],
+              "android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt": ["fun playVideo", "fun openBrowser", "VideoView", "setAcceptThirdPartyCookies", "onCreateWindow", "requestFocus"],
               "android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt": ['"playVideoOnDesktop"', '"installApk"', '"openWifiSettings"'],
               "android/app/src/main/AndroidManifest.xml": ["REQUEST_INSTALL_PACKAGES"],
           }
