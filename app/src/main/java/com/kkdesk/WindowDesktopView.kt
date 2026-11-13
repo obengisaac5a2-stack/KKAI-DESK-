@@ -39,6 +39,8 @@ internal class WindowDesktopView(context: Context) : FrameLayout(context) {
     private val desktop = LinearLayout(context)
     private var pointerX = 0.5f
     private var pointerY = 0.5f
+    private var remoteButtonHeld = false
+    private var remoteDownTime = 0L
 
     init {
         setBackgroundColor(Color.rgb(13, 25, 42))
@@ -339,16 +341,35 @@ internal class WindowDesktopView(context: Context) : FrameLayout(context) {
         pointerX = x.coerceIn(0f, 1f)
         pointerY = y.coerceIn(0f, 1f)
         pointer.invalidate()
-        if (clicked && width > 0 && height > 0) {
-            val px = pointerX * width
-            val py = pointerY * height
-            val downTime = android.os.SystemClock.uptimeMillis()
-            val down = MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, px, py, 0)
-            val up = MotionEvent.obtain(downTime, downTime + 40, MotionEvent.ACTION_UP, px, py, 0)
-            dispatchTouchEvent(down)
-            dispatchTouchEvent(up)
-            down.recycle(); up.recycle()
+        if (width > 0 && height > 0) {
+            if (remoteButtonHeld) {
+                sendPointerEvent(MotionEvent.ACTION_MOVE)
+            } else if (clicked) {
+                val now = android.os.SystemClock.uptimeMillis()
+                sendPointerEvent(MotionEvent.ACTION_DOWN, now)
+                sendPointerEvent(MotionEvent.ACTION_UP, now + 40)
+            }
         }
+    }
+
+    fun setPointerButtonHeld(held: Boolean) {
+        if (remoteButtonHeld == held || width == 0 || height == 0) return
+        remoteButtonHeld = held
+        if (held) {
+            remoteDownTime = android.os.SystemClock.uptimeMillis()
+            sendPointerEvent(MotionEvent.ACTION_DOWN, remoteDownTime)
+        } else {
+            sendPointerEvent(MotionEvent.ACTION_UP)
+        }
+    }
+
+    private fun sendPointerEvent(action: Int, eventTime: Long = android.os.SystemClock.uptimeMillis()) {
+        val px = pointerX * width
+        val py = pointerY * height
+        val downTime = if (remoteButtonHeld && remoteDownTime != 0L) remoteDownTime else eventTime
+        val event = MotionEvent.obtain(downTime, eventTime, action, px, py, 0)
+        dispatchTouchEvent(event)
+        event.recycle()
     }
 
     private inner class PointerView(ctx: Context) : View(ctx) {
