@@ -26,6 +26,15 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.VideoView
+import android.widget.MediaController
+import android.widget.LinearLayout
+import android.widget.Button
+import android.widget.TextView
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.provider.Settings
 import org.json.JSONObject
 
 class MainActivity : Activity(), DisplayManager.DisplayListener {
@@ -203,16 +212,55 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             return try {
                 val uri = Uri.parse(uriText)
                 val mime = contentResolver.getType(uri) ?: "*/*"
-                val view = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, mime)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (mime.startsWith("video/") && role == "desktop") {
+                    runOnUiThread { desktopPresentation?.playVideo(uri) }
+                    true
+                } else {
+                    if (mime == "application/vnd.android.package-archive" && android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Allow KKAI-DESK to install apps, then select the APK again.", Toast.LENGTH_LONG).show()
+                            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + packageName)))
+                        }
+                        return false
+                    }
+                    val view = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, mime)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(view)
+                    true
                 }
-                startActivity(view)
-                true
             } catch (_: Exception) {
-                runOnUiThread { Toast.makeText(this@MainActivity, "No Android app can open this file.", Toast.LENGTH_LONG).show() }
+                runOnUiThread { Toast.makeText(this@MainActivity, "Android could not open this file. Check that a compatible app is installed.", Toast.LENGTH_LONG).show() }
                 false
             }
+        }
+
+        @JavascriptInterface
+        fun openWebPage(url: String): Boolean {
+            if (url.isBlank() || !(url.startsWith("https://") || url.startsWith("http://"))) return false
+            return try {
+                if (role == "desktop") {
+                    runOnUiThread { desktopPresentation?.openWebPage(url) }
+                    true
+                } else false
+            } catch (_: Exception) { false }
+        }
+
+        @JavascriptInterface
+        fun openWifiSettings(): Boolean {
+            return try {
+                runOnUiThread { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
+                true
+            } catch (_: Exception) { false }
+        }
+
+        @JavascriptInterface
+        fun openBluetoothSettings(): Boolean {
+            return try {
+                runOnUiThread { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                true
+            } catch (_: Exception) { false }
         }
 
         @JavascriptInterface
@@ -311,6 +359,9 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         private val onDesktopMessage: (String) -> Unit
     ) : Presentation(context, display) {
         private lateinit var desktopWebView: WebView
+        private lateinit var desktopRoot: FrameLayout
+        private var videoOverlay: FrameLayout? = null
+        private var browserOverlay: FrameLayout? = null
 
         override fun onCreate(savedInstanceState: Bundle?) {
             super.onCreate(savedInstanceState)
@@ -324,8 +375,111 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             }
             desktopWebView = WebView(context)
             configureWebView(desktopWebView, "desktop")
-            setContentView(desktopWebView)
+            desktopRoot = FrameLayout(context)
+            desktopRoot.addView(desktopWebView, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            setContentView(desktopRoot)
             desktopWebView.loadUrl("file:///android_asset/kkdex/index.html?desktop=1")
+        }
+
+        fun playVideo(uri: Uri) {
+            if (!::desktopRoot.isInitialized) return
+            videoOverlay?.let { desktopRoot.removeView(it) }
+            browserOverlay?.let { desktopRoot.removeView(it); browserOverlay = null }
+            val overlay = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
+            val player = VideoView(context)
+            overlay.addView(player, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            val controls = MediaController(context)
+            controls.setAnchorView(player)
+            player.setMediaController(controls)
+            val close = Button(context).apply {
+                text = "✕"
+                textSize = 18f
+                setOnClickListener {
+                    player.stopPlayback()
+                    desktopRoot.removeView(overlay)
+                    videoOverlay = null
+                }
+            }
+            overlay.addView(close, FrameLayout.LayoutParams(
+                56, 56, Gravity.TOP or Gravity.END
+            ))
+            desktopRoot.addView(overlay, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            videoOverlay = overlay
+            player.setOnErrorListener { _, _, _ ->
+                Toast.makeText(context, "This video format could not be played on KK DEX.", Toast.LENGTH_LONG).show()
+                true
+            }
+            player.setOnCompletionListener {
+                desktopRoot.removeView(overlay)
+                videoOverlay = null
+            }
+            player.setVideoURI(uri)
+            player.setOnPreparedListener { it.start() }
+        }
+
+        fun openWebPage(url: String) {
+            if (!::desktopRoot.isInitialized) return
+            browserOverlay?.let { desktopRoot.removeView(it) }
+            videoOverlay?.let { desktopRoot.removeView(it); videoOverlay = null }
+            val overlay = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
+            val column = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            val toolbar = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundColor(Color.rgb(24, 29, 40))
+            }
+            val back = Button(context).apply {
+                text = "‹"
+                setOnClickListener { if (browser.canGoBack()) browser.goBack() }
+            }
+            val address = TextView(context).apply {
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                maxLines = 1
+                text = url
+                layoutParams = LinearLayout.LayoutParams(0, 52, 1f)
+            }
+            val close = Button(context).apply {
+                text = "✕"
+                setOnClickListener {
+                    browser.stopLoading()
+                    desktopRoot.removeView(overlay)
+                    browserOverlay = null
+                }
+            }
+            toolbar.addView(back, LinearLayout.LayoutParams(52, 52))
+            toolbar.addView(address)
+            toolbar.addView(close, LinearLayout.LayoutParams(56, 52))
+            val browser = WebView(context)
+            configureWebView(browser, "browser")
+            browser.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, pageUrl: String?) {
+                    address.text = pageUrl ?: ""
+                }
+            }
+            column.addView(toolbar)
+            column.addView(browser, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            ))
+            overlay.addView(column, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            desktopRoot.addView(overlay, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            browserOverlay = overlay
+            browser.loadUrl(url)
         }
 
         fun notifyStorageReady() {
