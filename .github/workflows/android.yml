@@ -13,18 +13,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Development 7 storage wiring
+      - name: Inspect Development 7 Files and storage app
         shell: bash
         run: |
           ZIP="kk-dex-desktop-os-development (7).zip"
           mkdir -p "$RUNNER_TEMP/kkdex-development-7"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-7"
           ROOT="$RUNNER_TEMP/kkdex-development-7"
-          echo "===== PACKAGE ====="
-          cat "$ROOT/package.json"
-          echo "===== SOURCE REFERENCES ====="
-          grep -R -n -C 7 -E "pickFolder|chooseFolderForDesktop|listDirectory|Android storage|openApp\(['\\\"]storage|KKDexServices" "$ROOT/src/apps" "$ROOT/src/android" "$ROOT/src/system.tsx" "$ROOT/src/registry.ts" || true
-          echo "===== NATIVE PICKER ====="
-          sed -n '470,585p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt"
-          echo "===== STORAGE LISTING ====="
-          sed -n '1,125p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/StorageController.kt"
+          echo "===== FILES APP ANDROID STORAGE AREA ====="
+          sed -n '480,710p' "$ROOT/src/apps/Files.tsx"
+          echo "===== APP REGISTRY ====="
+          cat "$ROOT/src/registry.ts"
+          echo "===== SYSTEM APPS STORAGE REFERENCES ====="
+          grep -n -C 12 -E "StorageApp|function Storage|case \"storage\"|id: \"storage\"|openApp\(\"storage\"\)" "$ROOT/src/apps/SystemApps.tsx" "$ROOT/src/App.tsx" "$ROOT/src/registry.ts" || true
+          echo "===== NATIVE JS STORAGE ADAPTER ====="
+          sed -n '140,215p' "$ROOT/src/android/native.ts"
+          echo "===== NATIVE BRIDGE PICKER ====="
+          sed -n '480,580p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt"
