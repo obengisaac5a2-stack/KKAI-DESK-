@@ -80,8 +80,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: ${{ env.PROJECT_ROOT }}/package-lock.json
 
       - name: Build Development 7 desktop interface
         working-directory: ${{ env.PROJECT_ROOT }}
