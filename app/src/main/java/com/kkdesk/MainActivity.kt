@@ -232,43 +232,26 @@ private class DesktopPresentation(
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // A Presentation is a dialog on the secondary display. Explicitly size
-        // its window to the whole display and hide system bars on the TV.
+        // Keep the first external-display render deliberately simple and visible.
+        // Immersive/system-bar flags are applied only after the desktop is confirmed
+        // visible; some cast receivers otherwise show a blank output surface.
+        val view = WindowDesktopView(context)
+        desktopView = view
+        setContentView(view)
+
         window?.apply {
+            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            setDimAmount(0f)
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(
+                android.graphics.Color.rgb(13, 25, 42)
+            ))
             setLayout(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT
             )
-            addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-            setSoftInputMode(
-                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN or
-                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
-            )
-            decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                    View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                )
+            decorView.setBackgroundColor(android.graphics.Color.rgb(13, 25, 42))
+            decorView.systemUiVisibility = 0
         }
-
-        val view = WindowDesktopView(context)
-        desktopView = view
-        setContentView(view)
-        window?.setLayout(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT
-        )
-        window?.decorView?.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
     }
 
     fun updatePointer(x: Float, y: Float, clicked: Boolean) {
