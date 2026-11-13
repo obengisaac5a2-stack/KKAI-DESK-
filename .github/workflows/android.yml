@@ -17,7 +17,7 @@ jobs:
 
       - name: Unpack the latest supplied KK DEX desktop source
         run: |
-          ZIP_FILE="kk-dex-desktop-os-development (3).zip"
+          ZIP_FILE="kk-dex-desktop-os-development (4).zip"
           test -s "$ZIP_FILE"
           mkdir -p desktop-source
           unzip -q "$ZIP_FILE" -d desktop-source
