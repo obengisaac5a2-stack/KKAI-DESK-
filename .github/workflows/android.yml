@@ -14,17 +14,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # The Arena desktop ZIP is kept as a source artifact in the repository.
+      # When present, build its React/Vite desktop and install the production
+      # assets into the existing Android Presentation WebView asset directory.
+      - name: Set up Node.js
+        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: desktop-source/package-lock.json
+
+      - name: Build KK DEX desktop from Arena source
+        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
+        run: |
+          mkdir -p desktop-source
+          unzip -q kk-dex-desktop-os-development.zip -d desktop-source
+          cd desktop-source
+          npm ci
+          npx tsc --noEmit
+          npm run build
+          test -s dist/index.html
+          mkdir -p ../app/src/main/assets/kkdex
+          cp -R dist/. ../app/src/main/assets/kkdex/
+
+      - name: Verify desktop asset
+        run: |
+          test -s app/src/main/assets/kkdex/index.html
+          echo "KK DEX desktop asset is present."
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
+
       - name: Build debug APK
         run: gradle :app:assembleDebug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
