@@ -210,8 +210,8 @@ internal class WindowDesktopView(context: Context) : FrameLayout(context) {
             val lp = shell.layoutParams as LayoutParams
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    state.oldX = e.rawX.toInt() - lp.leftMargin
-                    state.oldY = e.rawY.toInt() - lp.topMargin
+                    state.oldX = (e.rawX - shell.x).toInt()
+                    state.oldY = (e.rawY - shell.y).toInt()
                     shell.bringToFront()
                 }
                 MotionEvent.ACTION_MOVE -> {
