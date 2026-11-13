@@ -296,8 +296,9 @@ private class DesktopPresentation(
     fun updatePointer(x: Float, y: Float, clicked: Boolean) {
         val web = desktopWebView ?: return
         if (!pageReady || web.width <= 0 || web.height <= 0) return
-        val px = x * web.width
-        val py = y * web.height
+        val density = web.resources.displayMetrics.density.coerceAtLeast(1f)
+        val px = x * (web.width / density)
+        val py = y * (web.height / density)
         val args = String.format(Locale.US, "%.1f,%.1f", px, py)
         web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.movePointer($args);", null)
         if (clicked) {
@@ -308,7 +309,8 @@ private class DesktopPresentation(
     fun setPointerButtonHeld(held: Boolean, x: Float, y: Float) {
         val web = desktopWebView ?: return
         if (!pageReady || web.width <= 0 || web.height <= 0) return
-        val args = String.format(Locale.US, "%.1f,%.1f", x * web.width, y * web.height)
+        val density = web.resources.displayMetrics.density.coerceAtLeast(1f)
+        val args = String.format(Locale.US, "%.1f,%.1f", x * (web.width / density), y * (web.height / density))
         val method = if (held) "pointerDown" else "pointerUp"
         web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.$method($args);", null)
     }
@@ -327,11 +329,4 @@ private class DesktopPresentation(
         )
     }
 
-    override fun onStop() {
-        pageReady = false
-        desktopWebView?.stopLoading()
-        desktopWebView?.destroy()
-        desktopWebView = null
-        super.onStop()
-    }
 }
