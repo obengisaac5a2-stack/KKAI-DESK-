@@ -177,8 +177,9 @@ private class DesktopPresentation(context: Context, display: Display) :
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        desktopView = DesktopView(context)
-        setContentView(desktopView)
+        val view = DesktopView(context)
+        desktopView = view
+        setContentView(view)
     }
 
     fun updatePointer(x: Float, y: Float, clicked: Boolean) {
