@@ -302,7 +302,7 @@ private class DesktopPresentation(
         val args = String.format(Locale.US, "%.1f,%.1f", px, py)
         web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.movePointer($args);", null)
         if (clicked) {
-            web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.pointerClick($args);", null)
+            web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.pointerClick();", null)
         }
     }
 
@@ -312,7 +312,7 @@ private class DesktopPresentation(
         val density = web.resources.displayMetrics.density.coerceAtLeast(1f)
         val args = String.format(Locale.US, "%.1f,%.1f", x * (web.width / density), y * (web.height / density))
         val method = if (held) "pointerDown" else "pointerUp"
-        web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.$method($args);", null)
+        web.evaluateJavascript("window.KKDexAPI && window.KKDexAPI.$method();", null)
     }
 
     fun insertText(value: String) {
