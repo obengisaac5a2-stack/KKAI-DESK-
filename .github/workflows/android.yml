@@ -101,7 +101,7 @@ jobs:
                   return
               if old not in source:
                   # Match the same source fragment even if the archive's indentation differs.
-                  pattern = re.sub(r"\\s+", r"\\\\s+", re.escape(old.strip()))
+                  pattern = re.sub(r"\s+", r"\\s+", re.escape(old.strip()))
                   match = re.search(pattern, source)
                   if not match:
                       raise SystemExit("Expected source block missing for " + label + "; refusing unsafe patch.")
