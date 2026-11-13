@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
+import android.widget.Button
 import android.widget.TextView
 import android.hardware.display.DisplayManager
 
@@ -63,6 +64,11 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         root.addView(title)
         root.addView(status)
         root.addView(instruction)
+        val displayTest = Button(this).apply {
+            text = "TEST ANDROID APP ON TV"
+            setOnClickListener { testActivityOnExternalDisplay() }
+        }
+        root.addView(displayTest)
         root.addView(trackpad, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
         ))
@@ -85,7 +91,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             desktopPresentation = null
             status.text = "No external screen detected. Connect your phone to a supported TV or monitor."
         } else {
-            status.text = "External display detected: ${display.name} • Display ID ${display.displayId} • Pointer ready"
+            status.text = "TV: ${display.name} • ID ${display.displayId} • flags=${display.flags} • state=${display.state} • pointer ready"
             if (desktopPresentation?.display?.displayId != display.displayId) {
                 desktopPresentation?.dismiss()
                 desktopPresentation = DesktopPresentation(this, display) { packageName ->
@@ -100,6 +106,23 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                     }
                 }
             }
+        }
+    }
+
+    private fun testActivityOnExternalDisplay() {
+        val display = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
+        if (display == null) {
+            status.text = "TEST: No presentation display is currently available."
+            return
+        }
+        try {
+            val intent = Intent(this, ExternalDisplayTestActivity::class.java)
+            val options = ActivityOptions.makeBasic().setLaunchDisplayId(display.displayId)
+            startActivity(intent, options.toBundle())
+            status.text = "TEST SENT to display ${display.displayId}. Check whether the KK Dex test screen appears on the TV. Android accepting the request is not proof yet."
+        } catch (error: Exception) {
+            status.text = "TEST FAILED: ${error.javaClass.simpleName}: ${error.localizedMessage}"
         }
     }
 
