@@ -1,4 +1,4 @@
-name: Android APK
+name: KK DEX Development 7 Android APK
 
 on:
   push:
@@ -9,25 +9,111 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Inspect Development 7 AndroidStorageApp and build configuration
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract the exact Development 7 project
         shell: bash
         run: |
           ZIP="kk-dex-desktop-os-development (7).zip"
+          test -s "$ZIP"
+          unzip -t "$ZIP"
           mkdir -p "$RUNNER_TEMP/kkdex-development-7"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-7"
           ROOT="$RUNNER_TEMP/kkdex-development-7"
-          echo "===== ANDROID STORAGE APP ====="
-          sed -n '145,420p' "$ROOT/src/apps/AndroidApps.tsx"
-          echo "===== ANDROID APP GRADLE ====="
-          cat "$ROOT/android/app/build.gradle.kts"
-          echo "===== ANDROID SETTINGS ====="
-          cat "$ROOT/android/settings.gradle.kts"
-          echo "===== ROOT BUILD / ASSET SETUP ====="
-          cat "$ROOT/android/build.gradle.kts"
-          cat "$ROOT/scripts/sync-android-assets.mjs"
-          echo "===== NATIVE BRIDGE DISPATCH ====="
-          sed -n '285,455p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt"
+          test -s "$ROOT/package.json"
+          test -s "$ROOT/src/apps/AndroidApps.tsx"
+          test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/MainActivity.kt"
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          echo "Confirmed the Development 7 React project and Android native source."
+
+      - name: Keep the TV desktop alive while Android storage picker is open
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          root = Path(os.environ["PROJECT_ROOT"])
+          activity = root / "android/app/src/main/java/com/kkdex/desktop/MainActivity.kt"
+          source = activity.read_text()
+          old = """    override fun onStop() {
+                  presentation?.dismiss()
+                  presentation = null
+                  bridge.presentationStopped()
+                  super.onStop()
+              }"""
+          new = """    override fun onStop() {
+                  // Android's SAF picker temporarily backgrounds this Activity.
+                  // Keep the TV Presentation/WebView alive while a picker or
+                  // permission result is pending so its JavaScript request can
+                  // receive the selected folder when Android returns.
+                  val androidPickerActive =
+                      pendingSaf != null || pendingFileChooser != null || pendingPermission != null
+                  if (!androidPickerActive) {
+                      presentation?.dismiss()
+                      presentation = null
+                      bridge.presentationStopped()
+                  }
+                  super.onStop()
+              }"""
+          if old not in source:
+              raise SystemExit("Expected Development 7 MainActivity.onStop block was not found; refusing to patch a different source.")
+          activity.write_text(source.replace(old, new, 1))
+
+          gradle = root / "android/app/build.gradle.kts"
+          build = gradle.read_text()
+          if "versionCode = 1" not in build or 'versionName = "1.0.0"' not in build:
+              raise SystemExit("Unexpected Development 7 app version; refusing to overwrite it.")
+          build = build.replace("versionCode = 1", "versionCode = 2", 1)
+          build = build.replace('versionName = "1.0.0"', 'versionName = "1.0.1"', 1)
+          gradle.write_text(build)
+
+          assert "androidPickerActive" in activity.read_text()
+          print("Applied the SAF lifecycle fix and set APK version 1.0.1 (versionCode 2).")
+          PY
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ${{ env.PROJECT_ROOT }}/package-lock.json
+
+      - name: Build Development 7 desktop interface
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: |
+          npm ci
+          npm run build
+          node scripts/sync-android-assets.mjs
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build Development 7 Android APK
+        working-directory: ${{ env.PROJECT_ROOT }}/android
+        run: gradle :app:assembleDebug
+
+      - name: Verify APK output
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: |
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          echo "Development 7 APK built successfully."
+
+      - name: Upload Development 7 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KKAI-DESK-development-7-storage-fix
+          path: ${{ env.PROJECT_ROOT }}/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
