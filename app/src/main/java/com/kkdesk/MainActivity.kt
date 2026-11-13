@@ -216,7 +216,8 @@ private class DesktopView(
     private val onLaunchApp: (String) -> Unit
 ) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val installedApps = context.packageManager.queryIntentActivities(
+    private val appPackageManager = context.packageManager
+    private val installedApps = appPackageManager.queryIntentActivities(
         Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
     ).filter { it.activityInfo.packageName != context.packageName }
         .distinctBy { it.activityInfo.packageName }
@@ -369,7 +370,7 @@ private class DesktopView(
                     installedApps.forEachIndexed { index, info ->
                         val y = 195f + index * 52f
                         roundRect(canvas, 275f, y, 1145f, y + 44f, 10f, 0xFF263B55.toInt())
-                        val label = info.loadLabel(context.packageManager).toString()
+                        val label = info.loadLabel(appPackageManager).toString()
                         text(canvas, label.take(42), 295f, y + 28f, 17f, 0xFFFFFFFF.toInt(), true)
                         text(canvas, "OPEN ON TV  ›", 985f, y + 28f, 13f, 0xFF8ED8FF.toInt(), true)
                     }
