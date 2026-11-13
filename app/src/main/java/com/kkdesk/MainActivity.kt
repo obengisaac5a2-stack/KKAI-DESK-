@@ -44,6 +44,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         )
         displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).getString("tree_uri", null)?.let { storageTreeUri = Uri.parse(it) }
         buildPhoneController()
         displayManager.registerDisplayListener(this, null)
         refreshExternalDisplay()
@@ -166,7 +167,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                 }
-                startActivityForResult(intent, storageTreeRequestCode)
+                runOnUiThread { startActivityForResult(intent, storageTreeRequestCode) }
                 true
             } catch (_: Exception) {
                 runOnUiThread { Toast.makeText(this@MainActivity, "Could not open Android storage picker.", Toast.LENGTH_LONG).show() }
@@ -234,9 +235,11 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                     val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                     contentResolver.takePersistableUriPermission(uri, flags)
                     storageTreeUri = uri
+                    getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).edit().putString("tree_uri", uri.toString()).apply()
                     Toast.makeText(this, "Phone storage connected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
                 } catch (_: Exception) {
                     storageTreeUri = uri
+                    getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).edit().putString("tree_uri", uri.toString()).apply()
                     Toast.makeText(this, "Folder selected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
                 }
             }
