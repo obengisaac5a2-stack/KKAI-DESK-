@@ -18,6 +18,12 @@ jobs:
       # The Arena desktop ZIP is kept as a source artifact in the repository.
       # When present, build its React/Vite desktop and install the production
       # assets into the existing Android Presentation WebView asset directory.
+      - name: Unpack Arena desktop source
+        if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
+        run: |
+          mkdir -p desktop-source
+          unzip -q kk-dex-desktop-os-development.zip -d desktop-source
+
       - name: Set up Node.js
         if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
         uses: actions/setup-node@v4
@@ -29,8 +35,6 @@ jobs:
       - name: Build KK DEX desktop from Arena source
         if: ${{ hashFiles('kk-dex-desktop-os-development.zip') != '' }}
         run: |
-          mkdir -p desktop-source
-          unzip -q kk-dex-desktop-os-development.zip -d desktop-source
           cd desktop-source
           npm ci
           npx tsc --noEmit
