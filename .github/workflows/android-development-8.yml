@@ -32,6 +32,35 @@ jobs:
           test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
+      - name: Repair Version 8 Android Kotlin compile errors
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          browser = Path("android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt")
+          source = browser.read_text()
+          replacements = {
+              "ContextCompat.checkSelfPermission(this, it)": "ContextCompat.checkSelfPermission(this@BrowserActivity, it)",
+              "ActivityCompat.requestPermissions(this, missing.toTypedArray(), REQUEST_GEOLOCATION)": "ActivityCompat.requestPermissions(this@BrowserActivity, missing.toTypedArray(), REQUEST_GEOLOCATION)",
+          }
+          for old, new in replacements.items():
+              if source.count(old) != 1:
+                  raise SystemExit(f"Expected exactly one occurrence of {old!r} in BrowserActivity.kt")
+              source = source.replace(old, new, 1)
+          browser.write_text(source)
+
+          downloads = Path("android/app/src/main/java/com/kkdex/desktop/DownloadController.kt")
+          source = downloads.read_text()
+          old = "java.io.File(Environment.DIRECTORY_DOWNLOADS.let { context.filesDir }).usableSpace"
+          new = "context.filesDir.usableSpace"
+          if source.count(old) != 1:
+              raise SystemExit("Expected the known invalid free-space expression in DownloadController.kt")
+          downloads.write_text(source.replace(old, new, 1))
+          print("Patched Activity context references and app-storage free-space check.")
+          PY
+
       - name: Route APK files to the Android installer before archive handling
         working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
