@@ -59,6 +59,7 @@ jobs:
               raise SystemExit("Expected the known invalid free-space expression in DownloadController.kt")
           downloads.write_text(source.replace(old, new, 1))
           # Android lint requires only READ/WRITE grant bits for takePersistableUriPermission.
+          source = browser.read_text()
           old_flags = "if (flags == 0) Intent.FLAG_GRANT_READ_URI_PERMISSION else flags"
           new_flags = """(flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)).let { grantFlags ->
                               if (grantFlags == 0) Intent.FLAG_GRANT_READ_URI_PERMISSION else grantFlags
