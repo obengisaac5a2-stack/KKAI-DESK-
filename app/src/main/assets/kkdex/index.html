@@ -4769,6 +4769,7 @@ const KKDex = {
             this.movePointer(x, y);
             const el = document.elementFromPoint(x, y);
             if (el) {
+                if (el.matches('input, textarea, [contenteditable="true"]')) el.focus();
                 el.dispatchEvent(new MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
             }
         },
