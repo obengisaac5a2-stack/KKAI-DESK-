@@ -58,7 +58,16 @@ jobs:
           if source.count(old) != 1:
               raise SystemExit("Expected the known invalid free-space expression in DownloadController.kt")
           downloads.write_text(source.replace(old, new, 1))
-          print("Patched Activity context references and app-storage free-space check.")
+          # Android lint requires only READ/WRITE grant bits for takePersistableUriPermission.
+          old_flags = "if (flags == 0) Intent.FLAG_GRANT_READ_URI_PERMISSION else flags"
+          new_flags = """(flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)).let { grantFlags ->
+                              if (grantFlags == 0) Intent.FLAG_GRANT_READ_URI_PERMISSION else grantFlags
+                          }"""
+          if old_flags not in source:
+              raise SystemExit("Could not find the URI permission flags expression in BrowserActivity.kt")
+          source = source.replace(old_flags, new_flags)
+          browser.write_text(source)
+          print("Patched Activity contexts, storage free-space check, and persistable URI permission flags.")
           PY
 
       - name: Route APK files to the Android installer before archive handling
@@ -148,7 +157,16 @@ jobs:
 
       - name: Build and lint the Android app
         working-directory: ${{ env.PROJECT_ROOT }}/android
-        run: gradle :app:lintDebug :app:assembleDebug
+        shell: bash
+        run: |
+          set +e
+          gradle :app:lintDebug :app:assembleDebug
+          result=$?
+          if [ "$result" -ne 0 ]; then
+            echo "---- Full Android lint report ----"
+            find app/build -name 'lint-results-debug.txt' -type f -exec cat {} \; || true
+            exit "$result"
+          fi
 
       - name: Verify APK and calculate checksum
         working-directory: ${{ env.PROJECT_ROOT }}
