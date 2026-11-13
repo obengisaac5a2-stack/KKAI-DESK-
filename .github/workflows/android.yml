@@ -87,6 +87,14 @@ jobs:
               };
             }
 
+            // Native Android services are exposed only to the trusted desktop WebView.
+            if (!new URLSearchParams(window.location.search).has("controller") && window.KKDexHost) {
+              window.KKDexServices = {
+                getInstalledApps: async () => JSON.parse(window.KKDexHost.getInstalledApps() || "[]"),
+                launchAndroidApp: async (packageName) => !!window.KKDexHost.launchApp(packageName)
+              };
+            }
+
             // Android host -> desktop app's existing remote-input event handler.
             window.__KKDEX_NATIVE_BROADCAST = (name, json) => {
               if (name !== "kkdex-remote") return;
