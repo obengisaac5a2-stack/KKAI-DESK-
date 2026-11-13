@@ -84,7 +84,8 @@ jobs:
             if (!new URLSearchParams(window.location.search).has("controller") && window.KKDexHost) {
               window.KKDexServices = {
                 getInstalledApps: async () => JSON.parse(window.KKDexHost.getInstalledApps() || "[]"),
-                launchAndroidApp: async (packageName) => !!window.KKDexHost.launchApp(packageName)
+                launchAndroidApp: async (packageName) => !!window.KKDexHost.launchApp(packageName),
+                requestStorageAccess: async () => !!window.KKDexHost.requestStorageAccess()
               };
             }
 
