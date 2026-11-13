@@ -132,22 +132,14 @@ jobs:
                 openBluetoothSettings?: () => void | Promise<void>;
                 setVolume?: (value: number) => void;''', "native service types")
 
-          patch("src/Panels.tsx",
-          ```          onClick={() => {
-                    if (window.KKDexServices?.setWifi)
-                      window.KKDexServices.setWifi(!online);
-                    else
-                      explain(
-                        "Network status",
-                        `This workspace is currently ${online ? "online" : "offline"} according to the browser. Changing Wi-Fi networks requires the Android native network adapter. No connection setting has been changed.`,
-                      );
-                  }}```,
-          ```          onClick={() => {
-                    if (window.KKDexServices?.openWifiSettings)
-                      void window.KKDexServices.openWifiSettings();
-                    else
-                      explain("Wi-Fi settings", "Open KK DEX on Android to manage real Wi-Fi networks.");
-                  }}```, "quick settings Wi-Fi action")          patch("src/Panels.tsx",
+          panels = root / "src/Panels.tsx"
+          panel_source = panels.read_text()
+          if "window.KKDexServices?.openWifiSettings" not in panel_source:
+              panel_source = panel_source.replace("window.KKDexServices?.setWifi", "window.KKDexServices?.openWifiSettings", 1)
+              panel_source = panel_source.replace("window.KKDexServices.setWifi(!online);", "void window.KKDexServices.openWifiSettings();", 1)
+              panels.write_text(panel_source)
+          if "window.KKDexServices?.openWifiSettings" not in panels.read_text():
+              raise SystemExit("Could not wire Development 7 Wi-Fi settings action.")          patch("src/Panels.tsx",
           '''          onClick={() =>
                       explain(
                         "Bluetooth",
