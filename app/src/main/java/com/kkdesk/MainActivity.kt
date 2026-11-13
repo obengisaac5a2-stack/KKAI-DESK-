@@ -24,6 +24,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     private lateinit var status: TextView
     private var pointerX = 0.5f
     private var pointerY = 0.5f
+    private var pointerButtonHeld = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +65,15 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         root.addView(title)
         root.addView(status)
         root.addView(instruction)
+        val holdButton = Button(this).apply {
+            text = "HOLD LEFT MOUSE BUTTON: OFF"
+            setOnClickListener {
+                pointerButtonHeld = !pointerButtonHeld
+                text = if (pointerButtonHeld) "HOLD LEFT MOUSE BUTTON: ON" else "HOLD LEFT MOUSE BUTTON: OFF"
+                desktopPresentation?.setPointerButtonHeld(pointerButtonHeld)
+            }
+        }
+        root.addView(holdButton)
         val displayTest = Button(this).apply {
             text = "TEST ANDROID APP ON TV"
             setOnClickListener { testActivityOnExternalDisplay() }
@@ -100,6 +110,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                     try {
                         it.show()
                         it.updatePointer(pointerX, pointerY, false)
+                        it.setPointerButtonHeld(pointerButtonHeld)
                     } catch (error: Exception) {
                         status.text = "Display found, but desktop could not start: " + error.localizedMessage
                         desktopPresentation = null
@@ -231,6 +242,10 @@ private class DesktopPresentation(
 
     fun updatePointer(x: Float, y: Float, clicked: Boolean) {
         desktopView?.updatePointer(x, y, clicked)
+    }
+
+    fun setPointerButtonHeld(held: Boolean) {
+        desktopView?.setPointerButtonHeld(held)
     }
 }
 
