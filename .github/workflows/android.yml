@@ -22,6 +22,28 @@ jobs:
           mkdir -p desktop-source
           unzip -q "$ZIP_FILE" -d desktop-source
 
+      - name: Connect App Center to real Android applications
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          types = Path('desktop-source/src/types.ts')
+          t = types.read_text()
+          t = t.replace('      requestStorageAccess?: () => Promise<boolean>;', '      requestStorageAccess?: () => Promise<boolean>;\n      getInstalledApps?: () => Promise<Array<{ packageName: string; name: string }>>;\n      launchAndroidApp?: (packageName: string) => Promise<boolean>;')
+          types.write_text(t)
+          app = Path('desktop-source/src/apps/Connected.tsx')
+          a = app.read_text()
+          a = a.replace('  const [category, setCategory] = useState("All apps");', '  const [category, setCategory] = useState("All apps");\n  const [androidApps, setAndroidApps] = useState<Array<{packageName: string; name: string}>>([]);\n  const [androidAppsError, setAndroidAppsError] = useState("");\n  useEffect(() => { window.KKDexServices?.getInstalledApps?.().then(setAndroidApps).catch(() => setAndroidAppsError("Could not read installed Android apps.")); }, []);\n  const launchAndroid = async (packageName: string) => { const ok = await window.KKDexServices?.launchAndroidApp?.(packageName); if (!ok) setAndroidAppsError("Android could not launch that application."); };')
+          a = a.replace('      <div className="app-center-footer">', '''      <section style={{ padding: "22px 28px", borderTop: "1px solid var(--line, #ddd)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div><span className="eyebrow">ANDROID APPLICATIONS</span><h2 style={{ margin: "6px 0" }}>Apps installed on your phone</h2><p>Launch real Android apps from KK DEX.</p></div>
+          <button onClick={() => window.KKDexServices?.getInstalledApps?.().then(setAndroidApps).catch(() => setAndroidAppsError("Could not refresh apps."))}>Refresh</button>
+        </div>
+        {androidAppsError && <p role="status">{androidAppsError}</p>}
+        {androidApps.length ? <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(190px,1fr))", gap: 10, marginTop: 14 }}>{androidApps.map(app => <button key={app.packageName} onClick={() => launchAndroid(app.packageName)} style={{ display: "flex", alignItems: "center", gap: 10, padding: 12, textAlign: "left", border: "1px solid var(--line, #ddd)", borderRadius: 12, background: "var(--surface, white)", color: "inherit" }}><span style={{ fontSize: 20 }}>▣</span><span><strong>{app.name}</strong><br/><small>Open Android app</small></span></button>)}</div> : <p style={{ marginTop: 12 }}>Loading installed applications…</p>}
+      </section>
+      <div className="app-center-footer">''')
+          app.write_text(a)
+          PY
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
