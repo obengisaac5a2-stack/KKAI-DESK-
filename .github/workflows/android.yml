@@ -22,26 +22,7 @@ jobs:
           mkdir -p desktop-source
           unzip -q "$ZIP_FILE" -d desktop-source
 
-      - name: Connect App Center to real Android applications
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          types = Path('desktop-source/src/types.ts')
-          t = types.read_text()
-          t = t.replace('      requestStorageAccess?: () => Promise<boolean>;', '      requestStorageAccess?: () => Promise<boolean>;\n      getInstalledApps?: () => Promise<Array<{ packageName: string; name: string }>>;\n      launchAndroidApp?: (packageName: string) => Promise<boolean>;')
-          types.write_text(t)
-          app = Path('desktop-source/src/apps/Connected.tsx')
-          a = app.read_text()
-          a = a.replace('  const [category, setCategory] = useState("All apps");', '  const [category, setCategory] = useState("All apps");\n  const [androidApps, setAndroidApps] = useState<Array<{packageName: string; name: string}>>([]);\n  const [androidAppsError, setAndroidAppsError] = useState("");\n  useEffect(() => { window.KKDexServices?.getInstalledApps?.().then(setAndroidApps).catch(() => setAndroidAppsError("Could not read installed Android apps.")); }, []);\n  const launchAndroid = async (packageName: string) => { const ok = await window.KKDexServices?.launchAndroidApp?.(packageName); if (!ok) setAndroidAppsError("Android could not launch that application."); };')
-          section = '<section className="app-center-footer"><strong>Android applications installed on your phone</strong><p>Launch real Android apps from KK DEX.</p><button onClick={() => window.KKDexServices?.getInstalledApps?.().then(setAndroidApps)}>Refresh apps</button>{androidAppsError && <p role="status">{androidAppsError}</p>}<div>{androidApps.map(app => <button key={app.packageName} onClick={() => launchAndroid(app.packageName)}><strong>{app.name}</strong> — Open Android app</button>)}</div></section><div className="app-center-footer">'
-          a = a.replace('      <div className="app-center-footer">', section)
-          app.write_text(a)
-          files = Path('desktop-source/src/apps/Files.tsx')
-          f = files.read_text()
-          f = f.replace('Permission granted. The native host must provide a storage picker or file provider to browse device files.', 'Android folder access was granted. Use Import files to choose photos, videos, music, and documents from the selected location.')
-          f = f.replace('Direct device storage is not connected in this environment. Use the Import files action to choose files with the system picker. Native storage access requires an Android Storage Access Framework integration.', 'Choose a folder in the Android picker. After granting access, use Import files to select photos, videos, music, or documents from your phone.')
-          files.write_text(f)
-          PY
+      # Version 6 already supplies its own app interfaces and Android bridge.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
