@@ -84,6 +84,489 @@ jobs:
           print("Applied the SAF lifecycle fix and set APK version 1.0.1 (versionCode 2).")
           PY
 
+      - name: Apply Development 7 video, browser, Wi-Fi, Bluetooth, and APK integration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ["PROJECT_ROOT"])
+
+          def patch(rel, old, new, label):
+              path = root / rel
+              source = path.read_text()
+              if new in source:
+                  print("Already applied:", label)
+                  return
+              if old not in source:
+                  raise SystemExit("Expected source block missing for " + label + "; refusing unsafe patch.")
+              path.write_text(source.replace(old, new, 1))
+              print("Applied:", label)
+
+          patch("src/android/native.ts",
+          '''    openBrowser: async (url: string) => {
+                await call("openUrl", { url });
+              },
+              setVolume: (value: number) => {''',
+          '''    openBrowser: async (url: string) => {
+                await call("openUrl", { url });
+              },
+              openWifiSettings: async () => { await call("openWifiSettings"); },
+              openBluetoothSettings: async () => { await call("openBluetoothSettings"); },
+              setVolume: (value: number) => {''', "native settings methods")
+
+          patch("src/android/native.ts",
+          '''export const openDocument = (treeUri: string, uri: string, mime: string) =>
+            nativeCall<string>("openDocument", { treeUri, uri, mime });''',
+          '''export const openDocument = (treeUri: string, uri: string, mime: string) =>
+            nativeCall<string>("openDocument", { treeUri, uri, mime });
+          export const installApk = (uri: string) => nativeCall<string>("installApk", { uri });
+          export const playVideoOnDesktop = (uri: string) => nativeCall<string>("playVideoOnDesktop", { uri });
+          export const stopVideoOnDesktop = () => nativeCall<string>("stopVideoOnDesktop");''', "native APK and TV media functions")
+
+          patch("src/types.ts",
+          '''      openBrowser?: (url: string) => void | Promise<void>;
+                setVolume?: (value: number) => void;''',
+          '''      openBrowser?: (url: string) => void | Promise<void>;
+                openWifiSettings?: () => void | Promise<void>;
+                openBluetoothSettings?: () => void | Promise<void>;
+                setVolume?: (value: number) => void;''', "native service types")
+
+          patch("src/Panels.tsx",
+          '''            if (window.KKDexServices?.setWifi)
+                      window.KKDexServices.setWifi(!online);''',
+          '''            if (window.KKDexServices?.openWifiSettings)
+                      void window.KKDexServices.openWifiSettings();''', "quick settings Wi-Fi action")
+          patch("src/Panels.tsx",
+          '''          onClick={() =>
+                      explain(
+                        "Bluetooth",
+                        "Bluetooth controls are not connected. Pair and manage Bluetooth devices in Android system settings.",
+                      )
+                    }''',
+          '''          onClick={() => {
+                      if (window.KKDexServices?.openBluetoothSettings) void window.KKDexServices.openBluetoothSettings();
+                      else explain("Bluetooth settings", "Open KK DEX on Android to pair and manage real Bluetooth devices.");
+                    }}''', "quick settings Bluetooth action")
+
+          patch("src/apps/AndroidApps.tsx",
+          '''  getInstalledApps,
+                getSystemInfo,''',
+          '''  getInstalledApps,
+                installApk,
+                playVideoOnDesktop,
+                stopVideoOnDesktop,
+                getSystemInfo,''', "AndroidApps native imports")
+          patch("src/apps/AndroidApps.tsx",
+          '''    const kind = androidMediaKind(entry.mime, entry.name);
+                const payload = encodeAndroidPayload({ ...entry, treeUri });''',
+          '''    const kind = androidMediaKind(entry.mime, entry.name);
+                if (kind === "archive" && entry.name.toLowerCase().endsWith(".apk")) {
+                  try {
+                    const result = await installApk(entry.uri);
+                    system.notify("Android package installer", result, "appmanager");
+                  } catch (cause) { report("Could not start APK installation", cause); }
+                  return;
+                }
+                const payload = encodeAndroidPayload({ ...entry, treeUri });''', "Android Storage APK route")
+          patch("src/apps/AndroidApps.tsx",
+          '''  const [launching, setLaunching] = useState<string | null>(null);
+                const available = nativeAvailable();''',
+          '''  const [launching, setLaunching] = useState<string | null>(null);
+                const [installing, setInstalling] = useState(false);
+                const available = nativeAvailable();''', "App Manager install state")
+          patch("src/apps/AndroidApps.tsx",
+          '''  const [installing, setInstalling] = useState(false);
+                const available = nativeAvailable();
+
+                const load = async () => {''',
+          '''  const [installing, setInstalling] = useState(false);
+                const available = nativeAvailable();
+
+                const load = async () => {''', "App Manager install state verification")
+          patch("src/apps/AndroidApps.tsx",
+          '''  const visible = apps.filter((app) => \${app.label} \${app.packageName} .toLowerCase().includes(query.toLowerCase()));''',
+          '''  const visible = apps.filter((app) => \${app.label} \${app.packageName} .toLowerCase().includes(query.toLowerCase()));''', "noop visible guard")
+          # Insert the APK picker immediately before the App Manager unavailable-state branch.
+          patch("src/apps/AndroidApps.tsx",
+          '''  if (!available)
+                return (
+                  <NativeRequired
+                    title="Installed apps come from Android."''',
+          '''  const installPackage = async () => {
+                  setInstalling(true);
+                  try {
+                    const picked = await pickFiles("application/vnd.android.package-archive");
+                    const apk = picked.find((item) => item.name.toLowerCase().endsWith(".apk"));
+                    if (!apk) throw new Error("Choose an Android .apk file.");
+                    const result = await installApk(apk.uri);
+                    system.notify("Android package installer", result, "appmanager");
+                  } catch (cause) { report("APK installation was not started", cause); }
+                  finally { setInstalling(false); }
+                };
+
+                if (!available)
+                return (
+                  <NativeRequired
+                    title="Installed apps come from Android."''', "App Manager APK picker")
+          patch("src/apps/AndroidApps.tsx",
+          '''<div><span className="eyebrow">ANDROID PACKAGE MANAGER</span><h1>Installed apps</h1><p>Android controls which applications are visible and where they can launch.</p></div>
+                    <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>''',
+          '''<div><span className="eyebrow">ANDROID PACKAGE MANAGER</span><h1>Installed apps</h1><p>Launch installed apps or ask Android to install an APK you select.</p></div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="secondary-button" onClick={() => void installPackage()} disabled={installing}><Upload size={14} /> {installing ? "Opening installer…" : "Install APK"}</button>
+                      <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>
+                    </div>''', "App Manager Install APK button")
+
+          patch("src/apps/AndroidApps.tsx",
+          '''      const url = await contentUrl(next.treeUri || "", next.uri, next.mime);
+                    setEntry(next);
+                    setSource(url);
+                    setStatus(\`Streaming \${next.name} from its authorized Android URI\`);''',
+          '''      if (mode === "video") {
+                      const result = await playVideoOnDesktop(next.uri);
+                      setEntry(next);
+                      setSource("");
+                      setStatus(result || "Playing on the television display");
+                      return;
+                    }
+                    const url = await contentUrl(next.treeUri || "", next.uri, next.mime);
+                    setEntry(next);
+                    setSource(url);
+                    setStatus(\`Streaming \${next.name} from its authorized Android URI\`);''', "TV-native video playback")
+          patch("src/apps/AndroidApps.tsx",
+          '''        {mode === "video" && source ? (
+                      <video src={source} controls autoPlay playsInline onError={() => setStatus("Android could not stream this video. Open it with an Android viewer instead.")} />
+                    ) : mode === "music" && source ? (''',
+          '''        {mode === "video" && entry ? (
+                      <div className="media-empty">
+                        <Video size={48} />
+                        <h2>Playing on your TV.</h2>
+                        <p>{status}</p>
+                        <button className="secondary-button" onClick={() => void stopVideoOnDesktop().then(setStatus).catch((cause) => report("Could not stop TV video", cause))}>Stop playback</button>
+                      </div>
+                    ) : mode === "music" && source ? (''', "TV video playback status")
+          patch("src/apps/AndroidApps.tsx",
+          '''        {entry && (
+                      <button className="text-tool" onClick={() => void openDocument(entry.treeUri || "", entry.uri, entry.mime).then((result) => system.notify("Opened in Android", result, mode)).catch((cause) => report("No Android viewer available", cause))}>
+                        <ExternalLink size={14} /> Open in Android player
+                      </button>
+                    )}''',
+          '''        {entry && mode === "music" && (
+                      <button className="text-tool" onClick={() => void openDocument(entry.treeUri || "", entry.uri, entry.mime).then((result) => system.notify("Opened in Android", result, mode)).catch((cause) => report("No Android viewer available", cause))}>
+                        <ExternalLink size={14} /> Open in Android player
+                      </button>
+                    )}''', "avoid phone video player")
+
+          patch("src/apps/Connected.tsx",
+          '''import { AppIcon } from "../icons";''',
+          '''import { AppIcon } from "../icons";
+                import { nativeAvailable } from "../android/native";''', "browser native bridge import")
+          patch("src/apps/Connected.tsx",
+          '''  useEffect(() => {
+                    if (!loading) return;
+                    const timer = setTimeout(() => setLoading(false), 7000);
+                    return () => clearTimeout(timer);
+                  }, [loading, url]);''',
+          '''  useEffect(() => {
+                    if (isHome || !nativeAvailable() || !window.KKDexServices?.openBrowser) return;
+                    void Promise.resolve(window.KKDexServices.openBrowser(url)).catch((cause) =>
+                      explain("Could not open the TV browser", cause instanceof Error ? cause.message : String(cause)),
+                    );
+                  }, [url, active, isHome, explain]);
+                  useEffect(() => {
+                    if (!loading) return;
+                    const timer = setTimeout(() => setLoading(false), 7000);
+                    return () => clearTimeout(timer);
+                  }, [loading, url]);''', "browser opens native TV WebView")
+          patch("src/apps/Connected.tsx",
+          '''              {
+                        label: "GitHub",
+                        url: "https://github.com",
+                        letter: "G",
+                        color: "github",
+                      },''',
+          '''              {
+                        label: "GitHub",
+                        url: "https://github.com",
+                        letter: "G",
+                        color: "github",
+                      },
+                      {
+                        label: "YouTube",
+                        url: "https://www.youtube.com",
+                        letter: "▶",
+                        color: "youtube",
+                      },''', "YouTube browser shortcut")
+          patch("src/apps/Connected.tsx",
+          '''      ) : (
+                    <div className="browser-web-content">
+                      <div className="browser-embed-notice">''',
+          '''      ) : nativeAvailable() ? (
+                    <div className="browser-web-content browser-tv-notice">
+                      <div className="browser-embed-notice"><Info size={13} /><span>{loading ? "Opening this website on the television…" : "This website is open in KK DEX's TV browser. Close its overlay to return to the desktop."}</span></div>
+                    </div>
+                  ) : (
+                    <div className="browser-web-content">
+                      <div className="browser-embed-notice">''', "native TV browser instead of iframe")
+          patch("src/apps/Connected.tsx",
+          '''              "The applications shown here are built into this desktop and are ready to open. Installing additional Android applications requires a native package-manager integration, which is not connected in this environment. No installation will be simulated.",''',
+          '''              "KK DEX can hand a selected APK to Android's Package Installer. Android verifies the package and asks you to approve installation. Some apps may still refuse to run on an external display.",''', "App Center install explanation")
+
+          patch("android/app/src/main/java/com/kkdex/desktop/MainActivity.kt",
+          '''    fun openSystemSettings() {
+                    startActivity(Intent(Settings.ACTION_SETTINGS))
+                }''',
+          '''    fun openSystemSettings() {
+                    startActivity(Intent(Settings.ACTION_SETTINGS))
+                }
+
+                fun openWifiSettings(): String {
+                    runOnUiThread { startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
+                    return "Android Wi-Fi settings opened. Choose a real network, then return to KK DEX."
+                }
+                fun openBluetoothSettings(): String {
+                    runOnUiThread { startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+                    return "Android Bluetooth settings opened. Pair a device, then return to KK DEX."
+                }
+                fun playVideoOnDesktop(uriValue: String): String {
+                    val uri = Uri.parse(uriValue)
+                    if (uri.scheme != "content") throw IllegalArgumentException("Only Android-authorized content URIs can be played.")
+                    val active = presentation ?: throw IllegalStateException("Connect the television before starting TV video playback.")
+                    runOnUiThread { active.playVideo(uri) }
+                    return "Video playback was sent to the television display."
+                }
+                fun stopVideoOnDesktop(): String {
+                    val active = presentation ?: return "No TV playback is active."
+                    runOnUiThread { active.stopVideo() }
+                    return "TV video playback stopped."
+                }
+                fun openBrowserOnDesktop(url: String): String {
+                    val uri = Uri.parse(url)
+                    if (uri.scheme != "https" && uri.scheme != "http") throw IllegalArgumentException("Only HTTP and HTTPS websites are allowed.")
+                    val active = presentation
+                    if (active == null) return openExternalIntent(Intent(Intent.ACTION_VIEW, uri))
+                    runOnUiThread { active.openBrowser(url) }
+                    return "Opened in the KK DEX browser on the television."
+                }
+                fun installApk(uriValue: String): String {
+                    val uri = Uri.parse(uriValue)
+                    if (uri.scheme != "content") throw IllegalArgumentException("Select an APK through Android's file picker.")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                        runOnUiThread { startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) }
+                        return "Android opened the permission page. Allow KK DEX to install apps, return, and select the APK again."
+                    }
+                    val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    return openExternalIntent(intent)
+                }''', "MainActivity native actions")
+
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''import android.content.Context
+                import android.graphics.Color''',
+          '''import android.content.Context
+                import android.net.Uri
+                import android.graphics.Color''', "TV presentation Uri import")
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''import android.view.Display
+                import android.view.ViewGroup
+                import android.view.WindowManager
+                import android.webkit.WebView''',
+          '''import android.view.Display
+                import android.view.Gravity
+                import android.view.ViewGroup
+                import android.view.WindowManager
+                import android.webkit.WebView
+                import android.webkit.WebViewClient
+                import android.webkit.WebChromeClient
+                import android.widget.Button
+                import android.widget.EditText
+                import android.widget.FrameLayout
+                import android.widget.LinearLayout
+                import android.widget.MediaController
+                import android.widget.VideoView
+                import android.text.InputType''', "TV browser/video imports")
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''    lateinit var webView: WebView
+                    private set
+
+                    override fun onCreate(savedInstanceState: Bundle?) {''',
+          '''    lateinit var webView: WebView
+                    private set
+                    private lateinit var root: FrameLayout
+                    private var videoOverlay: FrameLayout? = null
+                    private var browserOverlay: FrameLayout? = null
+                    private var browserView: WebView? = null
+
+                    override fun onCreate(savedInstanceState: Bundle?) {''', "TV overlay state")
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''        setContentView(webView)
+                    bridge.attachDesktop(webView)''',
+          '''        root = FrameLayout(context)
+                    root.addView(webView, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                    ))
+                    setContentView(root)
+                    bridge.attachDesktop(webView)''', "TV root frame")
+          patch("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
+          '''    override fun onStart() {
+                    super.onStart()
+                    bridge.presentationStarting()
+                }
+
+                override fun onStop() {
+                    bridge.detachDesktop(webView)''',
+          '''    fun playVideo(uri: Uri) {
+                    stopVideo()
+                    closeBrowser()
+                    val overlay = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
+                    val player = VideoView(context)
+                    overlay.addView(player, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                    val controls = MediaController(context)
+                    controls.setAnchorView(player)
+                    player.setMediaController(controls)
+                    val close = Button(context).apply { text = "Close video"; setOnClickListener { stopVideo() } }
+                    overlay.addView(close, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, 52, Gravity.TOP or Gravity.END))
+                    root.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                    videoOverlay = overlay
+                    player.setOnErrorListener { _, what, extra ->
+                        android.widget.Toast.makeText(context, "TV could not decode this video (error $what/$extra). Try an MP4 H.264 video.", android.widget.Toast.LENGTH_LONG).show()
+                        true
+                    }
+                    player.setOnCompletionListener { stopVideo() }
+                    player.setVideoURI(uri)
+                    player.setOnPreparedListener { mediaPlayer -> mediaPlayer.start() }
+                }
+
+                fun stopVideo() {
+                    val overlay = videoOverlay ?: return
+                    (overlay.getChildAt(0) as? VideoView)?.stopPlayback()
+                    root.removeView(overlay)
+                    videoOverlay = null
+                }
+
+                fun openBrowser(url: String) {
+                    browserView?.let { current -> current.loadUrl(url); return }
+                    stopVideo()
+                    val overlay = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
+                    val browser = WebView(context).apply {
+                        setBackgroundColor(Color.BLACK)
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.allowFileAccess = false
+                        settings.allowContentAccess = false
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        webChromeClient = WebChromeClient()
+                        webViewClient = WebViewClient()
+                    }
+                    val toolbar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setBackgroundColor(Color.rgb(24, 34, 29)) }
+                    val back = Button(context).apply { text = "Back"; setOnClickListener { if (browser.canGoBack()) browser.goBack() } }
+                    val address = EditText(context).apply {
+                        setSingleLine(true)
+                        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+                        setTextColor(Color.WHITE)
+                        setHintTextColor(Color.LTGRAY)
+                        hint = "Enter a website"
+                        setText(url)
+                        layoutParams = LinearLayout.LayoutParams(0, 52, 1f)
+                        setOnEditorActionListener { _, _, _ ->
+                            val target = text.toString().trim()
+                            if (target.startsWith("https://") || target.startsWith("http://")) browser.loadUrl(target)
+                            true
+                        }
+                    }
+                    val go = Button(context).apply { text = "Go"; setOnClickListener {
+                        val target = address.text.toString().trim()
+                        if (target.startsWith("https://") || target.startsWith("http://")) browser.loadUrl(target)
+                    } }
+                    val reload = Button(context).apply { text = "↻"; setOnClickListener { browser.reload() } }
+                    val close = Button(context).apply { text = "Close"; setOnClickListener { closeBrowser() } }
+                    toolbar.addView(back, LinearLayout.LayoutParams(64, 52))
+                    toolbar.addView(address)
+                    toolbar.addView(go, LinearLayout.LayoutParams(60, 52))
+                    toolbar.addView(reload, LinearLayout.LayoutParams(56, 52))
+                    toolbar.addView(close, LinearLayout.LayoutParams(76, 52))
+                    overlay.addView(browser, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                    overlay.addView(toolbar, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 56, Gravity.TOP))
+                    root.addView(overlay, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+                    browserOverlay = overlay
+                    browserView = browser
+                    browser.loadUrl(url)
+                }
+
+                private fun closeBrowser() {
+                    browserView?.let { it.stopLoading(); it.loadUrl("about:blank"); it.destroy() }
+                    browserView = null
+                    browserOverlay?.let { root.removeView(it) }
+                    browserOverlay = null
+                }
+
+                override fun onStart() {
+                    super.onStart()
+                    bridge.presentationStarting()
+                }
+
+                override fun onStop() {
+                    stopVideo()
+                    closeBrowser()
+                    bridge.detachDesktop(webView)''', "TV native playback and browser overlays")
+
+          patch("android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt",
+          '''            "openUrl" -> openUrl(args.optString("url"))
+                    "getInstalledApps" -> installedApps.installedApps()''',
+          '''            "openUrl" -> openUrl(args.optString("url"))
+                    "openWifiSettings" -> activity.openWifiSettings()
+                    "openBluetoothSettings" -> activity.openBluetoothSettings()
+                    "installApk" -> activity.installApk(args.optString("uri"))
+                    "playVideoOnDesktop" -> {
+                        if (role != Role.DESKTOP) throw SecurityException("Only the TV desktop can start TV video playback.")
+                        activity.playVideoOnDesktop(args.optString("uri"))
+                    }
+                    "stopVideoOnDesktop" -> {
+                        if (role != Role.DESKTOP) throw SecurityException("Only the TV desktop can stop TV video playback.")
+                        activity.stopVideoOnDesktop()
+                    }
+                    "getInstalledApps" -> installedApps.installedApps()''', "NativeBridge new methods")
+          patch("android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt",
+          '''        val intent = Intent(Intent.ACTION_VIEW, uri)
+                    return activity.openExternalIntent(intent)
+                }''',
+          '''        return activity.openBrowserOnDesktop(uri.toString())
+                }''', "NativeBridge browser route")
+
+          manifest = root / "android/app/src/main/AndroidManifest.xml"
+          content = manifest.read_text()
+          permission = '    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />'
+          if permission not in content:
+              content = content.replace('    <uses-permission android:name="android.permission.INTERNET" />',
+                                        '    <uses-permission android:name="android.permission.INTERNET" />\\n' + permission, 1)
+              manifest.write_text(content)
+
+          gradle = root / "android/app/build.gradle.kts"
+          build = gradle.read_text()
+          if 'versionCode = 2' in build and 'versionName = "1.0.1"' in build:
+              build = build.replace("versionCode = 2", "versionCode = 3", 1).replace('versionName = "1.0.1"', 'versionName = "1.0.2"', 1)
+              gradle.write_text(build)
+          elif not ('versionCode = 3' in build and 'versionName = "1.0.2"' in build):
+              raise SystemExit("Unexpected Development 7 version; refusing to bump a different source.")
+
+          required = {
+              "src/apps/AndroidApps.tsx": ["playVideoOnDesktop", "Install APK", "installApk"],
+              "src/apps/Connected.tsx": ["YouTube", "nativeAvailable()"],
+              "src/Panels.tsx": ["openWifiSettings", "openBluetoothSettings"],
+              "android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt": ["fun playVideo", "fun openBrowser", "VideoView"],
+              "android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt": ['"playVideoOnDesktop"', '"installApk"', '"openWifiSettings"'],
+              "android/app/src/main/AndroidManifest.xml": ["REQUEST_INSTALL_PACKAGES"],
+          }
+          for rel, needles in required.items():
+              source = (root / rel).read_text()
+              for needle in needles:
+                  if needle not in source: raise SystemExit(f"Development 7 verification failed: {needle} missing from {rel}")
+          print("Development 7 native integrations verified.")
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
