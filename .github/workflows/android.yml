@@ -12,94 +12,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Version 4 KK DEX project
         uses: actions/checkout@v4
 
-      - name: Unpack the latest supplied KK DEX desktop source
-        run: |
-          ZIP_FILE="kk-dex-desktop-os-development (6).zip"
-          test -s "$ZIP_FILE"
-          mkdir -p desktop-source
-          unzip -q "$ZIP_FILE" -d desktop-source
-
-      # Version 6 already supplies its own app interfaces and Android bridge.
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: desktop-source/package-lock.json
-
-      - name: Build the supplied desktop and phone-controller interfaces
-        run: |
-          cd desktop-source
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("vite.config.ts")
-          s = p.read_text()
-          if "base:" not in s:
-              s = s.replace("export default defineConfig({", 'export default defineConfig({\n  base: "./",')
-          p.write_text(s)
-          PY
-          npm ci
-          npx tsc --noEmit
-          npm run build
-          test -s dist/index.html
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("dist/index.html")
-          s = p.read_text()
-          bridge = r"""
-          <script>
-          (() => {
-            // Phone controller -> Android host -> external desktop WebView.
-            if (new URLSearchParams(window.location.search).has("controller")) {
-              window.KKDexControllerBridge = {
-                sendInput(message) {
-                  try {
-                    const parsed = typeof message === "string" ? JSON.parse(message) : message;
-                    window.KKDexHost?.postMessage("kkdex-remote", JSON.stringify(parsed));
-                  } catch (error) {
-                    console.error("KK DEX controller transport error", error);
-                  }
-                }
-              };
-            }
-
-            // Native Android services are exposed only to the trusted desktop WebView.
-            if (!new URLSearchParams(window.location.search).has("controller") && window.KKDexHost) {
-              window.KKDexServices = {
-                getInstalledApps: async () => JSON.parse(window.KKDexHost.getInstalledApps() || "[]"),
-                launchAndroidApp: async (packageName) => !!window.KKDexHost.launchApp(packageName),
-                requestStorageAccess: async () => !!window.KKDexHost.requestStorageAccess()
-              };
-            }
-
-            // Android host -> desktop app's existing remote-input event handler.
-            window.__KKDEX_NATIVE_BROADCAST = (name, json) => {
-              if (name !== "kkdex-remote") return;
-              let data;
-              try { data = JSON.parse(json); } catch (_) { return; }
-              window.dispatchEvent(new CustomEvent("kkdex:input", { detail: data }));
-            };
-          })();
-          </script>
-          """
-          if "__KKDEX_NATIVE_BROADCAST" not in s:
-              s = s.replace("<head>", "<head>" + bridge, 1)
-          p.write_text(s)
-          PY
-          mkdir -p ../app/src/main/assets/kkdex
-          rm -rf ../app/src/main/assets/kkdex/*
-          cp -R dist/. ../app/src/main/assets/kkdex/
-
-      - name: Verify bundled interfaces
+      - name: Verify Version 4 desktop interface and Android storage integration
         run: |
           test -s app/src/main/assets/kkdex/index.html
-          grep -q "__KKDEX_NATIVE_BROADCAST" app/src/main/assets/kkdex/index.html
-          grep -q "KKDexControllerBridge" app/src/main/assets/kkdex/index.html
-          grep -q "kkdex:input" app/src/main/assets/kkdex/index.html
-          echo "Supplied KK DEX interface, controller transport, and desktop input receiver are bundled."
+          grep -q "files-phone-storage" app/src/main/assets/kkdex/index.html
+          grep -q "getStorageFiles" app/src/main/assets/kkdex/index.html
+          grep -q "openStorageFile" app/src/main/assets/kkdex/index.html
+          grep -q "getStorageFiles" app/src/main/java/com/kkdesk/MainActivity.kt
+          echo "Version 4 desktop interface and Android storage bridge verified."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -118,6 +41,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: KKAI-DESK-debug-apk
+          name: KKAI-DESK-version-4-storage-fix
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
