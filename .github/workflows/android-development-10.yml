@@ -1,0 +1,100 @@
+name: KK DEX Development 10 APK
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/android-development-10.yml"
+      - "kk-dex-desktop-os-development (10).zip"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify and extract Development 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="kk-dex-desktop-os-development (10).zip"
+          test -s "$ZIP"
+          unzip -t "$ZIP"
+          mkdir -p "$RUNNER_TEMP/kkdex-development-10"
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-10"
+          ROOT="$(find "$RUNNER_TEMP/kkdex-development-10" -maxdepth 4 -type f -name package.json -printf '%h\n' | head -n 1)"
+          test -n "$ROOT"
+          test -d "$ROOT/android"
+          test -f "$ROOT/android/settings.gradle" -o -f "$ROOT/android/settings.gradle.kts"
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          echo "Development 10 source root: $ROOT"
+          find "$ROOT" -maxdepth 2 -type f | sort | head -160
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies and build
+        working-directory: ${ env.PROJECT_ROOT }
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then
+            npm run build
+          else
+            echo "No frontend build script declared; continuing with Android build."
+          fi
+          if [ -f scripts/sync-android-assets.mjs ]; then
+            node scripts/sync-android-assets.mjs
+          fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build Development 10 debug APK
+        working-directory: ${ env.PROJECT_ROOT }/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew :app:assembleDebug
+          else
+            gradle :app:assembleDebug
+          fi
+
+      - name: Verify and package APK
+        working-directory: ${ env.PROJECT_ROOT }
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find android -type f -path '*/build/outputs/apk/*/*.apk' ! -name '*androidTest*' | head -n 1)"
+          test -n "$APK"
+          mkdir -p deliverables
+          cp "$APK" deliverables/KK-DEX-Development-10-debug.apk
+          sha256sum deliverables/KK-DEX-Development-10-debug.apk | tee deliverables/SHA256SUMS.txt
+          ls -lh deliverables/
+
+      - name: Upload Development 10 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-Development-10-APK
+          path: ${ env.PROJECT_ROOT }/deliverables/
+          if-no-files-found: error
+          retention-days: 14
