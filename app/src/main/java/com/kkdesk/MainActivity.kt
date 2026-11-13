@@ -224,7 +224,7 @@ private class DesktopPresentation(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val view = DesktopView(context, onLaunchApp)
+        val view = DesktopShellView(context, onLaunchApp)
         desktopView = view
         setContentView(view)
     }
