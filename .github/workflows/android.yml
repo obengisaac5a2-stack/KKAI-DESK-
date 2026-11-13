@@ -13,18 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect Development 7 storage component routing
+      - name: Inspect Development 7 AndroidStorageApp and build configuration
         shell: bash
         run: |
           ZIP="kk-dex-desktop-os-development (7).zip"
           mkdir -p "$RUNNER_TEMP/kkdex-development-7"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-7"
           ROOT="$RUNNER_TEMP/kkdex-development-7"
-          echo "===== STORAGE COMPONENT DEFINITIONS ====="
-          grep -R -n -C 6 -E "StorageApp|AndroidStorage|function .*Storage|case \"storage\"|appId === \"storage\"|id === \"storage\"|storage ===" "$ROOT/src" || true
-          echo "===== APP ROUTING ====="
-          cat "$ROOT/src/App.tsx"
-          echo "===== FILES APP STORAGE UI ====="
-          sed -n '630,900p' "$ROOT/src/apps/Files.tsx"
-          echo "===== ANDROID ROOT TYPES ====="
-          grep -n -A 35 -B 5 "interface AndroidRoot\|type AndroidRoot\|interface AndroidFileEntry\|type AndroidFileEntry" "$ROOT/src/types.ts"
+          echo "===== ANDROID STORAGE APP ====="
+          sed -n '145,420p' "$ROOT/src/apps/AndroidApps.tsx"
+          echo "===== ANDROID APP GRADLE ====="
+          cat "$ROOT/android/app/build.gradle.kts"
+          echo "===== ANDROID SETTINGS ====="
+          cat "$ROOT/android/settings.gradle.kts"
+          echo "===== ROOT BUILD / ASSET SETUP ====="
+          cat "$ROOT/android/build.gradle.kts"
+          cat "$ROOT/scripts/sync-android-assets.mjs"
+          echo "===== NATIVE BRIDGE DISPATCH ====="
+          sed -n '285,455p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt"
