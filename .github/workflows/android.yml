@@ -196,9 +196,8 @@ jobs:
                 const available = nativeAvailable();
 
                 const load = async () => {''', "App Manager install state verification")
-          patch("src/apps/AndroidApps.tsx",
-          '''  const visible = apps.filter((app) => \${app.label} \${app.packageName} .toLowerCase().includes(query.toLowerCase()));''',
-          '''  const visible = apps.filter((app) => \${app.label} \${app.packageName} .toLowerCase().includes(query.toLowerCase()));''', "noop visible guard")
+          # Removed a no-op patch that expected a non-existent source expression.
+
           # Insert the APK picker immediately before the App Manager unavailable-state branch.
           patch("src/apps/AndroidApps.tsx",
           '''  if (!available)
