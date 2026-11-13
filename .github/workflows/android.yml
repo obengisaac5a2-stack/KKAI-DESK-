@@ -557,7 +557,8 @@ jobs:
                                 isUserGesture: Boolean,
                                 resultMsg: android.os.Message?,
                             ): Boolean {
-                                val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                                val message = resultMsg ?: return false
+                                val transport = message.obj as? WebView.WebViewTransport ?: return false
                                 val popup = WebView(context).apply {
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
@@ -568,14 +569,14 @@ jobs:
                                             favicon: android.graphics.Bitmap?,
                                         ) {
                                             if (url.startsWith("https://") || url.startsWith("http://")) {
-                                                browser.loadUrl(url)
+                                                browserView?.loadUrl(url)
                                                 view.post { view.stopLoading(); view.destroy() }
                                             }
                                         }
                                     }
                                 }
                                 transport.webView = popup
-                                resultMsg.sendToTarget()
+                                message.sendToTarget()
                                 return true
                             }
                         }
