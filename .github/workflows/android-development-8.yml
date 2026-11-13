@@ -68,7 +68,14 @@ jobs:
               raise SystemExit("Could not find the URI permission flags expression in BrowserActivity.kt")
           source = source.replace(old_flags, new_flags)
           browser.write_text(source)
-          print("Patched Activity contexts, storage free-space check, and persistable URI permission flags.")
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          xml = manifest.read_text()
+          camera_permission = '<uses-permission android:name="android.permission.CAMERA"'
+          camera_feature = '<uses-feature android:name="android.hardware.camera" android:required="false" />'
+          if camera_permission in xml and camera_feature not in xml:
+              xml = xml.replace("</manifest>", f"    {camera_feature}\\n</manifest>")
+              manifest.write_text(xml)
+          print("Patched Activity contexts, storage free-space check, URI permission flags, and optional camera hardware declaration.")
           PY
 
       - name: Route APK files to the Android installer before archive handling
