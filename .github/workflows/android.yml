@@ -233,7 +233,7 @@ jobs:
           '''      const url = await contentUrl(next.treeUri || "", next.uri, next.mime);
                     setEntry(next);
                     setSource(url);
-                    setStatus(\`Streaming \${next.name} from its authorized Android URI\`);''',
+                    setStatus(`Streaming ${next.name} from its authorized Android URI`);''',
           '''      if (mode === "video") {
                       const result = await playVideoOnDesktop(next.uri);
                       setEntry(next);
@@ -244,7 +244,7 @@ jobs:
                     const url = await contentUrl(next.treeUri || "", next.uri, next.mime);
                     setEntry(next);
                     setSource(url);
-                    setStatus(\`Streaming \${next.name} from its authorized Android URI\`);''', "TV-native video playback")
+                    setStatus(`Streaming ${next.name} from its authorized Android URI`);''', "TV-native video playback")
           patch("src/apps/AndroidApps.tsx",
           '''        {mode === "video" && source ? (
                       <video src={source} controls autoPlay playsInline onError={() => setStatus("Android could not stream this video. Open it with an Android viewer instead.")} />
