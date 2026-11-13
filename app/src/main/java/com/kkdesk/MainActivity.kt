@@ -3,6 +3,9 @@ package com.kkdesk
 import android.app.Activity
 import android.app.Presentation
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import org.json.JSONArray
 import android.graphics.Color
 import android.hardware.display.DisplayManager
 import android.os.Bundle
@@ -65,6 +68,29 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     }
 
     private inner class HostBridge(private val role: String) {
+        @JavascriptInterface
+        fun getInstalledApps(): String {
+            val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+            val apps = packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+                .map { info -> JSONObject().apply {
+                    put("packageName", info.activityInfo.packageName)
+                    put("name", info.loadLabel(packageManager).toString())
+                } }
+                .sortedBy { it.optString("name").lowercase() }
+            return JSONArray(apps).toString()
+        }
+
+        @JavascriptInterface
+        fun launchApp(packageName: String): Boolean {
+            if (packageName.isBlank() || packageName == this@MainActivity.packageName) return false
+            return try {
+                val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                startActivity(launch)
+                true
+            } catch (_: Exception) { false }
+        }
+
         @JavascriptInterface
         fun postMessage(channel: String, json: String) {
             if (channel != "kkdex-remote") return
