@@ -227,31 +227,16 @@ private class DesktopPresentation(
     display: Display,
     private val onLaunchApp: (String) -> Unit
 ) : Presentation(context, display) {
-    private var desktopView: WindowDesktopView? = null
+    private var desktopView: DesktopView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Keep the first external-display render deliberately simple and visible.
-        // Immersive/system-bar flags are applied only after the desktop is confirmed
-        // visible; some cast receivers otherwise show a blank output surface.
-        val view = WindowDesktopView(context)
+        // Restore the previously used KK Dex desktop renderer first.
+        // It is the known baseline that displayed the KK desktop on the TV.
+        val view = DesktopView(context, onLaunchApp)
         desktopView = view
         setContentView(view)
-
-        window?.apply {
-            clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            setDimAmount(0f)
-            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(
-                android.graphics.Color.rgb(13, 25, 42)
-            ))
-            setLayout(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT
-            )
-            decorView.setBackgroundColor(android.graphics.Color.rgb(13, 25, 42))
-            decorView.systemUiVisibility = 0
-        }
     }
 
     fun updatePointer(x: Float, y: Float, clicked: Boolean) {
@@ -259,7 +244,8 @@ private class DesktopPresentation(
     }
 
     fun setPointerButtonHeld(held: Boolean) {
-        desktopView?.setPointerButtonHeld(held)
+        // The legacy desktop renderer handles tap-to-click. Held dragging
+        // will be reconnected after the TV display baseline is verified.
     }
 }
 
