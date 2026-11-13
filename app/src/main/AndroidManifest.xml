@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -8,6 +9,8 @@
     </queries>
     <application
         android:allowBackup="true"
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
         android:label="KKAI-DESK"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
