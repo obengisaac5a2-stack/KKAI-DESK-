@@ -12,34 +12,19 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Extract Development 7 and inspect its real storage implementation
+      - uses: actions/checkout@v4
+      - name: Inspect Development 7 storage wiring
         shell: bash
         run: |
           ZIP="kk-dex-desktop-os-development (7).zip"
-          test -s "$ZIP"
-          unzip -t "$ZIP"
           mkdir -p "$RUNNER_TEMP/kkdex-development-7"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-7"
           ROOT="$RUNNER_TEMP/kkdex-development-7"
-          test -s "$ROOT/package.json"
-          test -s "$ROOT/android/settings.gradle.kts"
-          echo "===== PACKAGE.JSON ====="
+          echo "===== PACKAGE ====="
           cat "$ROOT/package.json"
-          echo "===== STORAGE / FILES SOURCE FILES ====="
-          for FILE in \
-            "$ROOT/src/apps/Files.tsx" \
-            "$ROOT/src/android/native.ts" \
-            "$ROOT/src/storage.ts" \
-            "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt" \
-            "$ROOT/android/app/src/main/java/com/kkdex/desktop/StorageController.kt" \
-            "$ROOT/android/app/src/main/java/com/kkdex/desktop/MainActivity.kt" \
-            "$ROOT/android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt" \
-            "$ROOT/scripts/sync-android-assets.mjs"; do
-            if [ -f "$FILE" ]; then
-              echo "===== $FILE ====="
-              cat "$FILE"
-            fi
-          done
+          echo "===== SOURCE REFERENCES ====="
+          grep -R -n -C 7 -E "pickFolder|chooseFolderForDesktop|listDirectory|Android storage|openApp\(['\\\"]storage|KKDexServices" "$ROOT/src/apps" "$ROOT/src/android" "$ROOT/src/system.tsx" "$ROOT/src/registry.ts" || true
+          echo "===== NATIVE PICKER ====="
+          sed -n '470,585p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt"
+          echo "===== STORAGE LISTING ====="
+          sed -n '1,125p' "$ROOT/android/app/src/main/java/com/kkdex/desktop/StorageController.kt"
