@@ -90,17 +90,25 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import os
+          import re
           root = Path(os.environ["PROJECT_ROOT"])
 
           def patch(rel, old, new, label):
               path = root / rel
               source = path.read_text()
-              if new in source:
+              if new.strip() in source:
                   print("Already applied:", label)
                   return
               if old not in source:
-                  raise SystemExit("Expected source block missing for " + label + "; refusing unsafe patch.")
-              path.write_text(source.replace(old, new, 1))
+                  # Match the same source fragment even if the archive's indentation differs.
+                  pattern = re.sub(r"\\s+", r"\\\\s+", re.escape(old.strip()))
+                  match = re.search(pattern, source)
+                  if not match:
+                      raise SystemExit("Expected source block missing for " + label + "; refusing unsafe patch.")
+                  source = source[:match.start()] + new.strip() + source[match.end():]
+              else:
+                  source = source.replace(old, new, 1)
+              path.write_text(source)
               print("Applied:", label)
 
           patch("src/android/native.ts",
