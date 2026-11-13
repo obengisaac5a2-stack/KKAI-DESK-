@@ -41,7 +41,7 @@ jobs:
           node-version: "22"
 
       - name: Install frontend dependencies and build
-        working-directory: ${ env.PROJECT_ROOT }
+        working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
         run: |
           set -euo pipefail
@@ -68,7 +68,7 @@ jobs:
         run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build Development 10 debug APK
-        working-directory: ${ env.PROJECT_ROOT }/android
+        working-directory: ${{ env.PROJECT_ROOT }}/android
         shell: bash
         run: |
           set -euo pipefail
@@ -80,7 +80,7 @@ jobs:
           fi
 
       - name: Verify and package APK
-        working-directory: ${ env.PROJECT_ROOT }
+        working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
         run: |
           set -euo pipefail
@@ -95,6 +95,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: KK-DEX-Development-10-APK
-          path: ${ env.PROJECT_ROOT }/deliverables/
+          path: ${{ env.PROJECT_ROOT }}/deliverables/
           if-no-files-found: error
           retention-days: 14
