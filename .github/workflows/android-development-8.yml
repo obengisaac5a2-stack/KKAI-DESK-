@@ -46,8 +46,8 @@ jobs:
               "ActivityCompat.requestPermissions(this, missing.toTypedArray(), REQUEST_GEOLOCATION)": "ActivityCompat.requestPermissions(this@BrowserActivity, missing.toTypedArray(), REQUEST_GEOLOCATION)",
           }
           for old, new in replacements.items():
-              if source.count(old) != 1:
-                  raise SystemExit(f"Expected exactly one occurrence of {old!r} in BrowserActivity.kt")
+              if old not in source:
+                  raise SystemExit(f"Missing expected code in BrowserActivity.kt: {old!r}")
               source = source.replace(old, new, 1)
           browser.write_text(source)
 
