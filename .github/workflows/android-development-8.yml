@@ -32,7 +32,7 @@ jobs:
           test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
-      - name: Fix APK routing in Development 8 Android Storage
+      - name: Route APK files to the Android installer before archive handling
         working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
         run: |
@@ -41,38 +41,12 @@ jobs:
           from pathlib import Path
           path = Path("src/apps/AndroidApps.tsx")
           source = path.read_text()
-          old = '''    const kind = androidMediaKind(entry.mime, entry.name);
-    const payload = encodeAndroidPayload({ ...entry, treeUri });
-    if (kind === "image") system.openApp("gallery", payload);'''
-          new = '''    const kind = androidMediaKind(entry.mime, entry.name);
-    const payload = encodeAndroidPayload({ ...entry, treeUri });
-    // APK files must reach Android's official package installer, not Archive Manager.
-    if (entry.mime === "application/vnd.android.package-archive" || entry.name.toLowerCase().endsWith(".apk")) {
-      system.setDialog({
-        title: "Install this Android APK?",
-        message: "Android will open its official package installer for " + entry.name + ". KK DEX cannot install silently or bypass unknown-source, signature or Play Protect checks.",
-        confirmLabel: "Open Android installer",
-        onConfirm: () => { void installApkUri(entry.uri).then((message) => system.notify("Android installer", message, "storage")).catch((cause) => report("APK installation could not start", cause)); },
-      });
-    }
-    else if (kind === "image") system.openApp("gallery", payload);'''
-          if old not in source:
-              raise SystemExit("Expected Android Storage open() block was not found; refusing an unsafe patch.")
-          source = source.replace(old, new, 1)
-          old_branch = '''    else if (entry.mime === "application/vnd.android.package-archive" || entry.name.toLowerCase().endsWith(".apk")) {
-      system.setDialog({
-        title: "Install this Android APK?",
-        message: `Android will open its official package installer for ${entry.name}. KK DEX cannot install silently or bypass unknown-source, signature or Play Protect checks.`,
-        confirmLabel: "Open Android installer",
-        onConfirm: () => { void installApkUri(entry.uri).then((message) => system.notify("Android installer", message, "storage")).catch((cause) => report("APK installation could not start", cause)); },
-      });
-    }
-'''
-          if old_branch not in source:
-              raise SystemExit("Expected old APK branch was not found; refusing to duplicate the installer route.")
-          source = source.replace(old_branch, "", 1)
-          path.write_text(source)
-          print("APK routing now takes priority over generic archive routing.")
+          old = '    else if (kind === "archive") system.openApp("archives", payload);'
+          new = '    else if (kind === "archive" && entry.mime !== "application/vnd.android.package-archive" && !entry.name.toLowerCase().endsWith(".apk")) system.openApp("archives", payload);'
+          if source.count(old) != 1:
+              raise SystemExit("Expected exactly one archive-routing line; refusing to patch an unexpected source.")
+          path.write_text(source.replace(old, new, 1))
+          print("APK files now bypass Archive Manager and reach the existing Android installer confirmation.")
           PY
 
       - name: Set up Node.js
