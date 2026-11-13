@@ -354,12 +354,14 @@ internal class WindowDesktopView(context: Context) : FrameLayout(context) {
 
     fun setPointerButtonHeld(held: Boolean) {
         if (remoteButtonHeld == held || width == 0 || height == 0) return
-        remoteButtonHeld = held
         if (held) {
+            remoteButtonHeld = true
             remoteDownTime = android.os.SystemClock.uptimeMillis()
             sendPointerEvent(MotionEvent.ACTION_DOWN, remoteDownTime)
         } else {
             sendPointerEvent(MotionEvent.ACTION_UP)
+            remoteButtonHeld = false
+            remoteDownTime = 0L
         }
     }
 
