@@ -437,6 +437,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                 gravity = Gravity.CENTER_VERTICAL
                 setBackgroundColor(Color.rgb(24, 29, 40))
             }
+            val browser = WebView(context)
             val back = Button(context).apply {
                 text = "‹"
                 setOnClickListener { if (browser.canGoBack()) browser.goBack() }
@@ -459,7 +460,6 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             toolbar.addView(back, LinearLayout.LayoutParams(52, 52))
             toolbar.addView(address)
             toolbar.addView(close, LinearLayout.LayoutParams(56, 52))
-            val browser = WebView(context)
             configureWebView(browser, "browser")
             browser.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, pageUrl: String?) {
