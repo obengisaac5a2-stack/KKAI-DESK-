@@ -1,6 +1,7 @@
 package com.kkdesk
 
 import android.app.Activity
+import android.app.ActivityOptions
 import android.app.Presentation
 import android.content.Context
 import android.content.Intent
@@ -123,11 +124,34 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         fun launchApp(packageName: String): Boolean {
             if (packageName.isBlank() || packageName == this@MainActivity.packageName) return false
             return try {
+                // KK DEX renders its desktop as a Presentation on the external display.
+                // Launch the selected Android app on that same display, not on the phone.
+                val externalDisplay = displayManager
+                    .getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+                    .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY && it.state == Display.STATE_ON }
+                    ?: run {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, "Connect the TV display before opening Android apps", Toast.LENGTH_LONG).show()
+                        }
+                        return false
+                    }
+
                 val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return false
                 launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                startActivity(launch)
+                val options = ActivityOptions.makeBasic()
+                    .setLaunchDisplayId(externalDisplay.displayId)
+                startActivity(launch, options.toBundle())
                 true
-            } catch (_: Exception) { false }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Android could not open this app on the TV. This app may not support external displays.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+                false
+            }
         }
 
         @JavascriptInterface
