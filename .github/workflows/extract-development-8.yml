@@ -1,0 +1,42 @@
+name: Inspect KK DEX Development 8 archive
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - ".github/workflows/extract-development-8.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test and extract Development 8
+        shell: bash
+        run: |
+          set -e
+          ZIP="kk-dex-desktop-os-development (8).zip"
+          test -s "$ZIP"
+          echo "Checking whether the Version 8 ZIP can be opened without a password..."
+          if ! unzip -t "$ZIP"; then
+            echo "::error::Version 8 ZIP could not be opened without a password. It may be password-protected or damaged."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/kkdex-development-8"
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-8"
+          echo "Extracted files:"
+          find "$RUNNER_TEMP/kkdex-development-8" -maxdepth 3 -type f | head -200
+          echo "PROJECT_ROOT=$RUNNER_TEMP/kkdex-development-8" >> "$GITHUB_ENV"
+
+      - name: Upload extracted Version 8 source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-extracted-source
+          path: ${{ env.PROJECT_ROOT }}/
+          if-no-files-found: error
+          retention-days: 5
