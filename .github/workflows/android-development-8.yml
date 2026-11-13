@@ -1,0 +1,117 @@
+name: KK DEX Development 8 verification and APK
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - ".github/workflows/android-development-8.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract the exact Development 8 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="kk-dex-desktop-os-development (8).zip"
+          test -s "$ZIP"
+          unzip -t "$ZIP"
+          mkdir -p "$RUNNER_TEMP/kkdex-development-8"
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-8"
+          ROOT="$RUNNER_TEMP/kkdex-development-8"
+          test -s "$ROOT/package.json"
+          test -s "$ROOT/src/App.tsx"
+          test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/MainActivity.kt"
+          test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
+          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies and build
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: |
+          npm ci
+          npm run build
+          npx tsc --noEmit
+          node scripts/sync-android-assets.mjs
+
+      - name: Run browser and desktop tests
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+          npm run dev -- --host 127.0.0.1 > "$RUNNER_TEMP/kkdex-vite.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:5173/ >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:5173/ >/dev/null
+          npx playwright test --reporter=list
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set the next test APK version
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/build.gradle.kts")
+          source = path.read_text()
+          if "versionCode = 1" not in source or 'versionName = "1.0.0"' not in source:
+              raise SystemExit("Unexpected Development 8 version; refusing to change a different source.")
+          source = source.replace("versionCode = 1", "versionCode = 5", 1)
+          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.4"', 1)
+          path.write_text(source)
+          assert "versionCode = 5" in path.read_text()
+          print("Building KK DEX 1.0.4 (versionCode 5).")
+          PY
+
+      - name: Build and lint the Android app
+        working-directory: ${{ env.PROJECT_ROOT }}/android
+        run: gradle :app:lintDebug :app:assembleDebug
+
+      - name: Verify APK and calculate checksum
+        working-directory: ${{ env.PROJECT_ROOT }}
+        run: |
+          set -e
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p deliverables
+          cp "$APK" deliverables/kkdex-debug.apk
+          sha256sum deliverables/kkdex-debug.apk | tee deliverables/kkdex-debug.apk.sha256
+          ls -lh deliverables/kkdex-debug.apk
+
+      - name: Upload Development 8 APK and verification reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-APK-and-reports
+          path: |
+            ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk
+            ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk.sha256
+            ${{ env.PROJECT_ROOT }}/android/app/build/reports/lint-results-debug.html
+          if-no-files-found: error
+          retention-days: 7
