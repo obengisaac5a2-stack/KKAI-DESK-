@@ -234,14 +234,13 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                 try {
                     val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                     contentResolver.takePersistableUriPermission(uri, flags)
-                    storageTreeUri = uri
-                    getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).edit().putString("tree_uri", uri.toString()).apply()
-                    Toast.makeText(this, "Phone storage connected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
                 } catch (_: Exception) {
-                    storageTreeUri = uri
-                    getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).edit().putString("tree_uri", uri.toString()).apply()
-                    Toast.makeText(this, "Folder selected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
+                    // Some document providers do not support persistable grants; keep this session's URI.
                 }
+                storageTreeUri = uri
+                getSharedPreferences("kkdex_storage", Context.MODE_PRIVATE).edit().putString("tree_uri", uri.toString()).apply()
+                Toast.makeText(this, "Phone storage connected.", Toast.LENGTH_SHORT).show()
+                notifyStorageReady()
             }
             return
         }
@@ -253,6 +252,12 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         data.clipData?.let { clip -> for (index in 0 until clip.itemCount) results.add(clip.getItemAt(index).uri) }
             ?: data.data?.let { results.add(it) }
         callback.onReceiveValue(results.distinct().toTypedArray())
+    }
+
+    private fun notifyStorageReady() {
+        val script = "window.dispatchEvent(new Event('kkdex-storage-ready'));"
+        if (::phoneWebView.isInitialized) phoneWebView.evaluateJavascript(script, null)
+        desktopPresentation?.notifyStorageReady()
     }
 
     private fun deliverToPhone(json: String) {
@@ -321,6 +326,11 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             configureWebView(desktopWebView, "desktop")
             setContentView(desktopWebView)
             desktopWebView.loadUrl("file:///android_asset/kkdex/index.html?desktop=1")
+        }
+
+        fun notifyStorageReady() {
+            if (!::desktopWebView.isInitialized) return
+            desktopWebView.evaluateJavascript("window.dispatchEvent(new Event('kkdex-storage-ready'));", null)
         }
 
         fun deliverToDesktop(json: String) {
