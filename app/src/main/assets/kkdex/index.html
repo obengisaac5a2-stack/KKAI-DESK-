@@ -3219,6 +3219,10 @@ const KKDex = {
                     if (qs === 'darkmode') {
                         KKDex.applyTheme(KKDex.state.theme === 'dark' ? 'light' : 'dark');
                         tile.classList.toggle('active', KKDex.state.theme === 'dark');
+                    } else if (qs === 'wifi') {
+                        window.KKDexHost?.openWifiSettings();
+                    } else if (qs === 'bluetooth') {
+                        window.KKDexHost?.openBluetoothSettings();
                     } else {
                         tile.classList.toggle('active');
                     }
@@ -4052,7 +4056,12 @@ const KKDex = {
                     if (!url) return;
                     if (!url.startsWith('http')) url = 'https://' + url;
                     urlBar.value = url;
-                    contentArea.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:none;" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>`;
+                    const host = window.KKDexHost;
+                    if (host && host.openWebPage(url)) {
+                        contentArea.innerHTML = '<div style="padding:24px;color:var(--text-secondary);">Opening website on the TV display…</div>';
+                    } else {
+                        contentArea.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"></iframe>`;
+                    }
                 };
 
                 urlBar.addEventListener('keydown', (e) => {
@@ -4075,16 +4084,19 @@ const KKDex = {
 
                 body.querySelector('#browser-back')?.addEventListener('click', () => {
                     const iframe = contentArea.querySelector('iframe');
-                    if (iframe) {
-                        try { iframe.contentWindow.history.back(); } catch(e) {}
-                    }
+                    if (iframe) { try { iframe.contentWindow.history.back(); } catch(e) {} }
+                    else if (urlBar.value) navigate(urlBar.value);
+                });
+
+                body.querySelector('#browser-forward')?.addEventListener('click', () => {
+                    const iframe = contentArea.querySelector('iframe');
+                    if (iframe) { try { iframe.contentWindow.history.forward(); } catch(e) {} }
                 });
 
                 body.querySelector('#browser-refresh')?.addEventListener('click', () => {
                     const iframe = contentArea.querySelector('iframe');
-                    if (iframe) {
-                        try { iframe.src = iframe.src; } catch(e) {}
-                    }
+                    if (iframe) { try { iframe.src = iframe.src; } catch(e) {} }
+                    else if (urlBar.value) navigate(urlBar.value);
                 });
             }
         },
@@ -4242,12 +4254,8 @@ const KKDex = {
                             <div class="settings-group">
                                 <div class="settings-group-title">Wi-Fi</div>
                                 <div class="settings-item">
-                                    <div><div class="settings-item-label">Wi-Fi</div></div>
-                                    <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
-                                </div>
-                                <div class="settings-item">
-                                    <div><div class="settings-item-label">Connected Network</div><div class="settings-item-desc">KK-Network-5G</div></div>
-                                    <span style="color:var(--success);font-size:13px;">Connected</span>
+                                    <div><div class="settings-item-label">Wi-Fi settings</div><div class="settings-item-desc">Manage real Android Wi-Fi networks and connections</div></div>
+                                    <button onclick="window.KKDexHost?.openWifiSettings()">Open</button>
                                 </div>
                             </div>`;
                         break;
@@ -4257,8 +4265,8 @@ const KKDex = {
                             <div class="settings-section-title">Bluetooth</div>
                             <div class="settings-group">
                                 <div class="settings-item">
-                                    <div><div class="settings-item-label">Bluetooth</div></div>
-                                    <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                                    <div><div class="settings-item-label">Bluetooth settings</div><div class="settings-item-desc">Manage real Android Bluetooth devices and pairing</div></div>
+                                    <button onclick="window.KKDexHost?.openBluetoothSettings()">Open</button>
                                 </div>
                             </div>`;
                         break;
