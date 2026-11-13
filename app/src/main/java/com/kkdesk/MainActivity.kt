@@ -5,6 +5,13 @@ import android.app.Presentation
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.app.DownloadManager
+import android.net.Uri
+import android.os.Environment
+import android.webkit.DownloadListener
+import android.webkit.ValueCallback
+import android.webkit.URLUtil
+import android.widget.Toast
 import org.json.JSONArray
 import android.graphics.Color
 import android.hardware.display.DisplayManager
@@ -23,6 +30,8 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     private lateinit var displayManager: DisplayManager
     private lateinit var phoneWebView: WebView
     private var desktopPresentation: DesktopPresentation? = null
+    private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
+    private val fileChooserRequestCode = 7001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,7 +59,37 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         }
         web.addJavascriptInterface(HostBridge(role), "KKDexHost")
-        web.webChromeClient = WebChromeClient()
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onShowFileChooser(view: WebView?, filePathCallback: ValueCallback<Array<Uri>>?, fileChooserParams: WebChromeClient.FileChooserParams?): Boolean {
+                pendingFileChooser?.onReceiveValue(null)
+                pendingFileChooser = filePathCallback
+                return try {
+                    val intent = fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"; putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true) }
+                    intent.addCategory(Intent.CATEGORY_OPENABLE)
+                    intent.type = "*/*"
+                    intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    startActivityForResult(intent, fileChooserRequestCode)
+                    true
+                } catch (_: Exception) { pendingFileChooser?.onReceiveValue(null); pendingFileChooser = null; false }
+            }
+        }
+        web.setDownloadListener(DownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            try {
+                val filename = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                    setMimeType(mimeType)
+                    addRequestHeader("User-Agent", userAgent)
+                    setTitle(filename)
+                    setDescription("Downloading with KK DEX")
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, filename)
+                    setAllowedOverMetered(true)
+                    setAllowedOverRoaming(false)
+                }
+                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                Toast.makeText(this@MainActivity, "Download started", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) { Toast.makeText(this@MainActivity, "Could not start this download", Toast.LENGTH_LONG).show() }
+        })
         web.webViewClient = WebViewClient()
     }
 
@@ -99,6 +138,19 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                 else deliverToPhone(json)
             }
         }
+    }
+
+    @Deprecated("Deprecated in Android API; retained for broad device compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != fileChooserRequestCode) return
+        val callback = pendingFileChooser ?: return
+        pendingFileChooser = null
+        if (resultCode != RESULT_OK || data == null) { callback.onReceiveValue(null); return }
+        val results = mutableListOf<Uri>()
+        data.clipData?.let { clip -> for (index in 0 until clip.itemCount) results.add(clip.getItemAt(index).uri) }
+            ?: data.data?.let { results.add(it) }
+        callback.onReceiveValue(results.distinct().toTypedArray())
     }
 
     private fun deliverToPhone(json: String) {
