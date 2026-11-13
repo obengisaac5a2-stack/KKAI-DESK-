@@ -9,13 +9,13 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  inspect:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract the exact Development 7 archive
+      - name: Extract Development 7 and inspect its real storage implementation
         shell: bash
         run: |
           ZIP="kk-dex-desktop-os-development (7).zip"
@@ -23,42 +23,23 @@ jobs:
           unzip -t "$ZIP"
           mkdir -p "$RUNNER_TEMP/kkdex-development-7"
           unzip -q "$ZIP" -d "$RUNNER_TEMP/kkdex-development-7"
-          PROJECT_ROOT="$(find "$RUNNER_TEMP/kkdex-development-7" -type f -name settings.gradle.kts -print -quit | xargs -r dirname)"
-          test -n "$PROJECT_ROOT"
-          test -s "$PROJECT_ROOT/app/src/main/assets/kkdex/index.html"
-          test -s "$PROJECT_ROOT/app/src/main/java/com/kkdesk/MainActivity.kt"
-          echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
-          echo "Development 7 Android project found at $PROJECT_ROOT"
-
-      - name: Apply the verified Android storage callback fix to Development 7
-        run: |
-          mkdir -p "$PROJECT_ROOT/app/src/main/java/com/kkdesk"
-          mkdir -p "$PROJECT_ROOT/app/src/main/assets/kkdex"
-          cp app/src/main/java/com/kkdesk/MainActivity.kt "$PROJECT_ROOT/app/src/main/java/com/kkdesk/MainActivity.kt"
-          cp app/src/main/assets/kkdex/index.html "$PROJECT_ROOT/app/src/main/assets/kkdex/index.html"
-          cp app/build.gradle.kts "$PROJECT_ROOT/app/build.gradle.kts"
-          grep -q "kkdex-storage-ready" "$PROJECT_ROOT/app/src/main/java/com/kkdesk/MainActivity.kt"
-          grep -q "kkdex-storage-ready" "$PROJECT_ROOT/app/src/main/assets/kkdex/index.html"
-          grep -q "androidx.documentfile:documentfile" "$PROJECT_ROOT/app/build.gradle.kts"
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
-
-      - name: Build Development 7 debug APK
-        working-directory: ${{ env.PROJECT_ROOT }}
-        run: gradle :app:assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: KKAI-DESK-development-7-storage-fix
-          path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          ROOT="$RUNNER_TEMP/kkdex-development-7"
+          test -s "$ROOT/package.json"
+          test -s "$ROOT/android/settings.gradle.kts"
+          echo "===== PACKAGE.JSON ====="
+          cat "$ROOT/package.json"
+          echo "===== STORAGE / FILES SOURCE FILES ====="
+          for FILE in \
+            "$ROOT/src/apps/Files.tsx" \
+            "$ROOT/src/android/native.ts" \
+            "$ROOT/src/storage.ts" \
+            "$ROOT/android/app/src/main/java/com/kkdex/desktop/NativeBridge.kt" \
+            "$ROOT/android/app/src/main/java/com/kkdex/desktop/StorageController.kt" \
+            "$ROOT/android/app/src/main/java/com/kkdex/desktop/MainActivity.kt" \
+            "$ROOT/android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt" \
+            "$ROOT/scripts/sync-android-assets.mjs"; do
+            if [ -f "$FILE" ]; then
+              echo "===== $FILE ====="
+              cat "$FILE"
+            fi
+          done
