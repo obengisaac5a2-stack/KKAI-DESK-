@@ -30,6 +30,14 @@ jobs:
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
           echo "Confirmed the Development 7 React project and Android native source."
 
+      - name: Export Development 7 source for targeted integration review
+        uses: actions/upload-artifact@v4
+        with:
+          name: KKAI-DESK-development-7-source-review
+          path: ${{ env.PROJECT_ROOT }}/
+          if-no-files-found: error
+          retention-days: 2
+
       - name: Keep the TV desktop alive while Android storage picker is open
         shell: bash
         run: |
