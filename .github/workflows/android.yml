@@ -139,7 +139,9 @@ jobs:
               panel_source = panel_source.replace("window.KKDexServices.setWifi(!online);", "void window.KKDexServices.openWifiSettings();", 1)
               panels.write_text(panel_source)
           if "window.KKDexServices?.openWifiSettings" not in panels.read_text():
-              raise SystemExit("Could not wire Development 7 Wi-Fi settings action.")          patch("src/Panels.tsx",
+              raise SystemExit("Could not wire Development 7 Wi-Fi settings action.")
+
+          patch("src/Panels.tsx",
           '''          onClick={() =>
                       explain(
                         "Bluetooth",
