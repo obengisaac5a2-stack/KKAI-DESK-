@@ -130,7 +130,7 @@ jobs:
           """.replace("\n          ", "\n"))
           print(f"Patched {source}")
 
-          gradle = source.parents[5] / "build.gradle.kts"
+          gradle = source.parents[6] / "build.gradle.kts"
           text = gradle.read_text()
           if 'versionCode = 1' not in text or 'versionName = "1.0.0"' not in text:
               raise SystemExit("Unexpected Development 10 version metadata; refusing to bump it.")
