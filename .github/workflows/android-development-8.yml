@@ -48,7 +48,7 @@ jobs:
           for old, new in replacements.items():
               if old not in source:
                   raise SystemExit(f"Missing expected code in BrowserActivity.kt: {old!r}")
-              source = source.replace(old, new, 1)
+              source = source.replace(old, new)
           browser.write_text(source)
 
           downloads = Path("android/app/src/main/java/com/kkdex/desktop/DownloadController.kt")
