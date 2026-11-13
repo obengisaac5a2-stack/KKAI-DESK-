@@ -73,7 +73,7 @@ jobs:
           camera_permission = '<uses-permission android:name="android.permission.CAMERA"'
           camera_feature = '<uses-feature android:name="android.hardware.camera" android:required="false" />'
           if camera_permission in xml and camera_feature not in xml:
-              xml = xml.replace("</manifest>", f"    {camera_feature}\\n</manifest>")
+              xml = xml.replace("</manifest>", f"    {camera_feature}\n</manifest>")
               manifest.write_text(xml)
           print("Patched Activity contexts, storage free-space check, URI permission flags, and optional camera hardware declaration.")
           PY
