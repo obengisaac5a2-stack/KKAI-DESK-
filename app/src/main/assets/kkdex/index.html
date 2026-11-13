@@ -3791,6 +3791,18 @@ const KKDex = {
         Files: {
             currentPath: 'Home',
             viewMode: 'grid',
+            phoneStorageFiles: [],
+            loadPhoneStorage(body) {
+                try {
+                    const host = window.KKDexHost;
+                    if (!host) return;
+                    const path = this.currentPath === 'Phone storage' ? '' : this.currentPath.replace(/^Phone storage\/?/, '');
+                    this.phoneStorageFiles = JSON.parse(host.getStorageFiles(path) || '[]');
+                    this.renderFiles(body);
+                    const count = body.querySelector('#files-item-count');
+                    if (count) count.textContent = this.phoneStorageFiles.length + ' phone items';
+                } catch (error) { console.error('KK DEX storage listing failed', error); }
+            },
 
             fileSystem: {
                 'Home': [
@@ -3857,7 +3869,7 @@ const KKDex = {
                             <div class="files-toolbar-btn" title="Up">⬆</div>
                             <div class="files-path" id="files-path-display">Home</div>
                             <div class="files-toolbar-btn" id="files-grid-view" title="Grid View">▦</div>
-                            <div class="files-toolbar-btn" id="files-list-view" title="List View">☰</div>
+                            <div class="files-toolbar-btn" id="files-list-view" title="List View">☰</div><div class="files-toolbar-btn" id="files-phone-storage" title="Connect / refresh Android phone storage">📱</div>
                             <input type="text" class="files-search" placeholder="Search files..." id="files-search-input">
                         </div>
                         <div class="files-content" id="files-content-area"></div>
@@ -3904,6 +3916,17 @@ const KKDex = {
                     this.renderFiles(body);
                 });
 
+                // Android phone storage: choose a folder, then list its real contents.
+                body.querySelector('#files-phone-storage')?.addEventListener('click', () => {
+                    const host = window.KKDexHost;
+                    if (!host) { alert('Android storage is available in the installed KK DEX app.'); return; }
+                    const connect = host.requestStorageAccess();
+                    if (connect) {
+                        this.currentPath = 'Phone storage';
+                        setTimeout(() => this.loadPhoneStorage(body), 900);
+                    }
+                });
+
                 // Search
                 body.querySelector('#files-search-input')?.addEventListener('input', (e) => {
                     this.renderFiles(body, e.target.value);
@@ -3921,7 +3944,9 @@ const KKDex = {
                 pathDisplay.textContent = this.currentPath;
                 viewLabel.textContent = this.viewMode === 'grid' ? 'Grid View' : 'List View';
 
-                let files = this.fileSystem[this.currentPath] || [];
+                let files = this.currentPath === 'Phone storage'
+                    ? this.phoneStorageFiles
+                    : (this.fileSystem[this.currentPath] || []);
                 if (searchQuery) {
                     files = files.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
                 }
@@ -3954,6 +3979,16 @@ const KKDex = {
                         item.classList.add('selected');
                     });
                     item.addEventListener('dblclick', () => {
+                        if (self.currentPath === 'Phone storage' || self.currentPath.startsWith('Phone storage/')) {
+                            const selected = self.phoneStorageFiles.find(f => f.name === item.dataset.name);
+                            if (selected?.type === 'folder') {
+                                self.currentPath = (self.currentPath === 'Phone storage' ? 'Phone storage' : self.currentPath) + '/' + selected.name;
+                                self.loadPhoneStorage(body);
+                            } else if (selected?.uri) {
+                                window.KKDexHost?.openStorageFile(selected.uri);
+                            }
+                            return;
+                        }
                         if (item.dataset.type === 'folder') {
                             const folderName = item.dataset.name;
                             if (self.fileSystem[folderName]) {
