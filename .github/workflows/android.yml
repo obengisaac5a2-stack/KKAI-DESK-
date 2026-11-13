@@ -51,36 +51,26 @@ jobs:
           bridge = r"""
           <script>
           (() => {
-            const channels = new Map();
-            class KKDexNativeBroadcastChannel {
-              constructor(name) {
-                this.name = name;
-                this.onmessage = null;
-                this.listeners = new Set();
-                if (!channels.has(name)) channels.set(name, new Set());
-                channels.get(name).add(this);
-              }
-              postMessage(data) {
-                try {
-                  window.KKDexHost?.postMessage(this.name, JSON.stringify(data));
-                } catch (error) { console.error("KK DEX native channel error", error); }
-              }
-              addEventListener(type, listener) { if (type === "message") this.listeners.add(listener); }
-              removeEventListener(type, listener) { if (type === "message") this.listeners.delete(listener); }
-              close() { channels.get(this.name)?.delete(this); }
-              start() {}
+            // Phone controller -> Android host -> external desktop WebView.
+            if (new URLSearchParams(window.location.search).has("controller")) {
+              window.KKDexControllerBridge = {
+                sendInput(message) {
+                  try {
+                    const parsed = typeof message === "string" ? JSON.parse(message) : message;
+                    window.KKDexHost?.postMessage("kkdex-remote", JSON.stringify(parsed));
+                  } catch (error) {
+                    console.error("KK DEX controller transport error", error);
+                  }
+                }
+              };
             }
-            window.BroadcastChannel = KKDexNativeBroadcastChannel;
+
+            // Android host -> desktop app's existing remote-input event handler.
             window.__KKDEX_NATIVE_BROADCAST = (name, json) => {
+              if (name !== "kkdex-remote") return;
               let data;
               try { data = JSON.parse(json); } catch (_) { return; }
-              for (const channel of channels.get(name) || []) {
-                const event = { data };
-                try { channel.onmessage?.(event); } catch (error) { console.error(error); }
-                for (const listener of channel.listeners) {
-                  try { listener.call(channel, event); } catch (error) { console.error(error); }
-                }
-              }
+              window.dispatchEvent(new CustomEvent("kkdex:input", { detail: data }));
             };
           })();
           </script>
@@ -97,7 +87,9 @@ jobs:
         run: |
           test -s app/src/main/assets/kkdex/index.html
           grep -q "__KKDEX_NATIVE_BROADCAST" app/src/main/assets/kkdex/index.html
-          echo "Supplied KK DEX interface and native phone-to-TV bridge are bundled."
+          grep -q "KKDexControllerBridge" app/src/main/assets/kkdex/index.html
+          grep -q "kkdex:input" app/src/main/assets/kkdex/index.html
+          echo "Supplied KK DEX interface, controller transport, and desktop input receiver are bundled."
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
