@@ -2,6 +2,8 @@ package com.kkdesk
 
 import android.app.Activity
 import android.app.Presentation
+import android.app.ActivityOptions
+import android.content.Intent
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -83,10 +85,12 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             desktopPresentation = null
             status.text = "No external screen detected. Connect your phone to a supported TV or monitor."
         } else {
-            status.text = "TV connected • Pointer touchpad ready"
+            status.text = "External display detected: ${display.name} • Display ID ${display.displayId} • Pointer ready"
             if (desktopPresentation?.display?.displayId != display.displayId) {
                 desktopPresentation?.dismiss()
-                desktopPresentation = DesktopPresentation(this, display).also {
+                desktopPresentation = DesktopPresentation(this, display) { packageName ->
+                    launchInstalledAppOnDisplay(packageName, display.displayId)
+                }.also {
                     try {
                         it.show()
                         it.updatePointer(pointerX, pointerY, false)
@@ -96,6 +100,23 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                     }
                 }
             }
+        }
+    }
+
+    private fun launchInstalledAppOnDisplay(packageName: String, displayId: Int) {
+        try {
+            val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+            if (launchIntent == null) {
+                status.text = "This app does not provide a launch screen."
+                return
+            }
+            val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
+            startActivity(launchIntent, options.toBundle())
+            status.text = "Requested app launch on external display (ID $displayId)."
+        } catch (error: SecurityException) {
+            status.text = "Android blocked this app from opening on the TV: ${error.localizedMessage}"
+        } catch (error: Exception) {
+            status.text = "Could not launch app on TV: ${error.localizedMessage}"
         }
     }
 
@@ -171,13 +192,16 @@ private class TouchpadView(
     }
 }
 
-private class DesktopPresentation(context: Context, display: Display) :
-    Presentation(context, display) {
+private class DesktopPresentation(
+    context: Context,
+    display: Display,
+    private val onLaunchApp: (String) -> Unit
+) : Presentation(context, display) {
     private var desktopView: DesktopView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val view = DesktopView(context)
+        val view = DesktopView(context, onLaunchApp)
         desktopView = view
         setContentView(view)
     }
@@ -187,8 +211,17 @@ private class DesktopPresentation(context: Context, display: Display) :
     }
 }
 
-private class DesktopView(context: Context) : View(context) {
+private class DesktopView(
+    context: Context,
+    private val onLaunchApp: (String) -> Unit
+) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val installedApps = context.packageManager.queryIntentActivities(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
+    ).filter { it.activityInfo.packageName != context.packageName }
+        .distinctBy { it.activityInfo.packageName }
+        .sortedBy { it.loadLabel(context.packageManager).toString().lowercase() }
+        .take(8)
     private var pointerX = 0.5f
     private var pointerY = 0.5f
     private var clickFlash = false
@@ -225,13 +258,15 @@ private class DesktopView(context: Context) : View(context) {
             if (x in 130f..280f) page = "FILES"
             if (x in 280f..430f) page = "BROWSER"
             if (x in 430f..590f) page = "SETTINGS"
+            if (x in 585f..735f) page = "APPS"
             return
         }
         if (page == "HOME") {
             if (x in 35f..180f) {
                 if (y in 95f..220f) page = "FILES"
                 else if (y in 225f..350f) page = "BROWSER"
-                else if (y in 355f..480f) page = "SETTINGS"
+                else if (y in 355f..470f) page = "SETTINGS"
+                else if (y in 475f..600f) page = "APPS"
             }
         } else {
             if (x > 1160f && y in 65f..125f) {
@@ -240,6 +275,12 @@ private class DesktopView(context: Context) : View(context) {
             }
             if (page == "SETTINGS" && x in 330f..950f && y in 250f..570f) {
                 wallpaper = (wallpaper + 1) % 3
+            }
+            if (page == "APPS" && x in 265f..1170f && y in 185f..610f) {
+                val index = ((y - 195f) / 52f).toInt()
+                installedApps.getOrNull(index)?.let {
+                    onLaunchApp(it.activityInfo.packageName)
+                }
             }
             if (page == "BROWSER" && x in 330f..1080f && y in 150f..220f) {
                 // The address field is a visual prototype; phone keyboard is planned for the next test.
@@ -276,12 +317,14 @@ private class DesktopView(context: Context) : View(context) {
         drawShortcut(canvas, 48f, 100f, "Files", 0xFF347DD1.toInt(), "▤")
         drawShortcut(canvas, 48f, 225f, "Browser", 0xFF238E83.toInt(), "◎")
         drawShortcut(canvas, 48f, 350f, "Settings", 0xFF7669C8.toInt(), "⚙")
+        drawShortcut(canvas, 48f, 475f, "Phone Apps", 0xFFB06A42.toInt(), "▦")
         roundRect(canvas, 285f, 145f, 1190f, 575f, 28f, 0xC51B2C45.toInt())
         text(canvas, "Welcome to KK Dex", 340f, 230f, 39f, 0xFFFFFFFF.toInt(), true)
         text(canvas, "A desktop experience, powered by your phone.", 340f, 278f, 21f, 0xFFBDCCE0.toInt())
         text(canvas, "Choose an application to get started", 340f, 355f, 17f, 0xFF8FA8C6.toInt())
         drawPill(canvas, 340f, 390f, 235f, 50f, "OPEN FILES", 0xFF245D91.toInt())
-        text(canvas, "PROTOTYPE 0.3  •  CLICKABLE DESKTOP", 340f, 520f, 14f, 0xFF7F9AB9.toInt())
+        text(canvas, "PROTOTYPE 0.4  •  ANDROID APP LAUNCH TEST", 340f, 520f, 14f, 0xFF7F9AB9.toInt())
+        text(canvas, "Open Phone Apps to test real apps on this external display.", 340f, 555f, 16f, 0xFFB9C7DA.toInt())
     }
 
     private fun drawAppPage(canvas: Canvas) {
@@ -289,6 +332,7 @@ private class DesktopView(context: Context) : View(context) {
         val title = when (page) {
             "FILES" -> "Files"
             "BROWSER" -> "Browser"
+            "APPS" -> "Phone Apps"
             else -> "Settings"
         }
         text(canvas, title, 275f, 130f, 29f, 0xFFFFFFFF.toInt(), true)
@@ -317,6 +361,21 @@ private class DesktopView(context: Context) : View(context) {
                 text(canvas, "Your browser workspace", 325f, 365f, 28f, 0xFFFFFFFF.toInt(), true)
                 text(canvas, "The phone keyboard and real browsing will be added in later tests.", 325f, 410f, 17f, 0xFFB9C7DA.toInt())
             }
+            "APPS" -> {
+                text(canvas, "REAL APPS INSTALLED ON THIS PHONE", 275f, 175f, 14f, 0xFF8FA8C6.toInt(), true)
+                if (installedApps.isEmpty()) {
+                    text(canvas, "No launchable apps were found.", 275f, 235f, 19f, 0xFFFFFFFF.toInt())
+                } else {
+                    installedApps.forEachIndexed { index, info ->
+                        val y = 195f + index * 52f
+                        roundRect(canvas, 275f, y, 1145f, y + 44f, 10f, 0xFF263B55.toInt())
+                        val label = info.loadLabel(context.packageManager).toString()
+                        text(canvas, label.take(42), 295f, y + 28f, 17f, 0xFFFFFFFF.toInt(), true)
+                        text(canvas, "OPEN ON TV  ›", 985f, y + 28f, 13f, 0xFF8ED8FF.toInt(), true)
+                    }
+                }
+                text(canvas, "Tap an app. Android may block some apps from launching on a cast display.", 275f, 625f, 13f, 0xFFFFD28A.toInt())
+            }
             "SETTINGS" -> {
                 text(canvas, "PERSONALIZE YOUR DESKTOP", 275f, 185f, 14f, 0xFF8FA8C6.toInt(), true)
                 settingRow(canvas, 275f, 215f, "Wallpaper", "Tap to cycle desktop backgrounds")
@@ -341,6 +400,7 @@ private class DesktopView(context: Context) : View(context) {
         taskItem(canvas, 135f, "Files", page == "FILES")
         taskItem(canvas, 285f, "Browser", page == "BROWSER")
         taskItem(canvas, 435f, "Settings", page == "SETTINGS")
+        taskItem(canvas, 585f, "Phone Apps", page == "APPS")
         text(canvas, "KK DEX", 1040f, 692f, 13f, 0xFF8FA8C6.toInt(), true)
         text(canvas, "●", 1140f, 692f, 13f, 0xFF77E0B0.toInt())
         text(canvas, "DESKTOP", 1160f, 692f, 12f, 0xFFB9C7DA.toInt())
