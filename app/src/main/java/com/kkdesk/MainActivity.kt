@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.app.DownloadManager
 import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import android.os.Environment
 import android.webkit.DownloadListener
 import android.webkit.ValueCallback
@@ -34,6 +35,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val fileChooserRequestCode = 7001
     private val storageTreeRequestCode = 7002
+    private var storageTreeUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,9 +169,47 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
                 startActivityForResult(intent, storageTreeRequestCode)
                 true
             } catch (_: Exception) {
-                runOnUiThread {
-                    Toast.makeText(this@MainActivity, "Could not open Android storage picker.", Toast.LENGTH_LONG).show()
+                runOnUiThread { Toast.makeText(this@MainActivity, "Could not open Android storage picker.", Toast.LENGTH_LONG).show() }
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun getStorageFiles(relativePath: String): String {
+            return try {
+                val rootUri = storageTreeUri ?: return JSONArray().toString()
+                var directory = DocumentFile.fromTreeUri(this@MainActivity, rootUri) ?: return JSONArray().toString()
+                relativePath.split("/").filter { it.isNotBlank() && it != "Phone storage" }.forEach { part ->
+                    directory = directory.findFile(part) ?: return JSONArray().toString()
                 }
+                val items = directory.listFiles().sortedWith(compareBy<DocumentFile> { !it.isDirectory }.thenBy { it.name?.lowercase() ?: "" })
+                JSONArray().apply {
+                    items.forEach { file ->
+                        put(JSONObject().apply {
+                            put("name", file.name ?: "Unnamed")
+                            put("type", if (file.isDirectory) "folder" else "file")
+                            put("size", if (file.isFile) file.length() else 0)
+                            put("uri", file.uri.toString())
+                            put("mimeType", file.type ?: "")
+                        })
+                    }
+                }.toString()
+            } catch (_: Exception) { JSONArray().toString() }
+        }
+
+        @JavascriptInterface
+        fun openStorageFile(uriText: String): Boolean {
+            return try {
+                val uri = Uri.parse(uriText)
+                val mime = contentResolver.getType(uri) ?: "*/*"
+                val view = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mime)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(view)
+                true
+            } catch (_: Exception) {
+                runOnUiThread { Toast.makeText(this@MainActivity, "No Android app can open this file.", Toast.LENGTH_LONG).show() }
                 false
             }
         }
@@ -191,13 +231,13 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
             if (resultCode == RESULT_OK && data?.data != null) {
                 val uri = data.data!!
                 try {
-                    contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                    Toast.makeText(this, "Folder access granted. Use Import files to select items from this folder.", Toast.LENGTH_LONG).show()
+                    val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    contentResolver.takePersistableUriPermission(uri, flags)
+                    storageTreeUri = uri
+                    Toast.makeText(this, "Phone storage connected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
                 } catch (_: Exception) {
-                    Toast.makeText(this, "Folder selected, but Android could not save access to it.", Toast.LENGTH_LONG).show()
+                    storageTreeUri = uri
+                    Toast.makeText(this, "Folder selected. Open Files on the TV and refresh Phone storage.", Toast.LENGTH_LONG).show()
                 }
             }
             return
