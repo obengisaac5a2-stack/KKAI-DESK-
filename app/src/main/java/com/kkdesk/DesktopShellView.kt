@@ -140,7 +140,7 @@ internal class DesktopShellView(
     }
 
     private fun drawTopBar(c: Canvas) {
-        panel(c, 0f, 0f, 1280f, 58f, 0xCC091421, 0f)
+        panel(c, 0f, 0f, 1280f, 58f, 0xCC091421.toInt(), 0f)
         label(c, "KK", 28f, 38f, 26f, 0xFF8EDBFF.toInt(), true)
         label(c, "DEX", 70f, 38f, 23f, 0xFFFFFFFF.toInt(), true)
         label(c, "WORKSPACE", 145f, 36f, 12f, 0xFF91A9C1.toInt(), true)
