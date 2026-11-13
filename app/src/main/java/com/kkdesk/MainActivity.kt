@@ -33,6 +33,7 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     private var desktopPresentation: DesktopPresentation? = null
     private var pendingFileChooser: ValueCallback<Array<Uri>>? = null
     private val fileChooserRequestCode = 7001
+    private val storageTreeRequestCode = 7002
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -124,31 +125,50 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
         fun launchApp(packageName: String): Boolean {
             if (packageName.isBlank() || packageName == this@MainActivity.packageName) return false
             return try {
-                // KK DEX renders its desktop as a Presentation on the external display.
-                // Launch the selected Android app on that same display, not on the phone.
+                val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return false
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 val externalDisplay = displayManager
                     .getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
                     .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY && it.state == Display.STATE_ON }
-                    ?: run {
+                if (externalDisplay != null) {
+                    try {
+                        val options = ActivityOptions.makeBasic()
+                            .setLaunchDisplayId(externalDisplay.displayId)
+                        startActivity(launch, options.toBundle())
+                    } catch (_: Exception) {
+                        // Do not swallow the tap: if Android blocks secondary-display launch,
+                        // fall back to the normal Android launch on the phone.
+                        startActivity(launch)
                         runOnUiThread {
-                            Toast.makeText(this@MainActivity, "Connect the TV display before opening Android apps", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, "This app cannot open on the TV, so Android opened it on the phone.", Toast.LENGTH_LONG).show()
                         }
-                        return false
                     }
-
-                val launch = packageManager.getLaunchIntentForPackage(packageName) ?: return false
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                val options = ActivityOptions.makeBasic()
-                    .setLaunchDisplayId(externalDisplay.displayId)
-                startActivity(launch, options.toBundle())
+                } else {
+                    startActivity(launch)
+                    runOnUiThread {
+                        Toast.makeText(this@MainActivity, "No TV desktop display was detected. Opened the app on the phone.", Toast.LENGTH_LONG).show()
+                    }
+                }
                 true
-            } catch (error: Exception) {
+            } catch (_: Exception) {
                 runOnUiThread {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Android could not open this app on the TV. This app may not support external displays.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(this@MainActivity, "Android could not open this application.", Toast.LENGTH_LONG).show()
+                }
+                false
+            }
+        }
+
+        @JavascriptInterface
+        fun requestStorageAccess(): Boolean {
+            return try {
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                }
+                startActivityForResult(intent, storageTreeRequestCode)
+                true
+            } catch (_: Exception) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "Could not open Android storage picker.", Toast.LENGTH_LONG).show()
                 }
                 false
             }
@@ -167,6 +187,21 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     @Deprecated("Deprecated in Android API; retained for broad device compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == storageTreeRequestCode) {
+            if (resultCode == RESULT_OK && data?.data != null) {
+                val uri = data.data!!
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                    Toast.makeText(this, "Folder access granted. Use Import files to select items from this folder.", Toast.LENGTH_LONG).show()
+                } catch (_: Exception) {
+                    Toast.makeText(this, "Folder selected, but Android could not save access to it.", Toast.LENGTH_LONG).show()
+                }
+            }
+            return
+        }
         if (requestCode != fileChooserRequestCode) return
         val callback = pendingFileChooser ?: return
         pendingFileChooser = null
