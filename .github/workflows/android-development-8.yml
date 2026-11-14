@@ -212,6 +212,7 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import textwrap
 
           def replace_once(path, old, new):
               p = Path(path)
@@ -330,42 +331,46 @@ jobs:
                 <span>{Math.round(p.textScale * 100)}%</span>
               </div>''')
           replace_once("tests/integration.spec.ts",
-              '''test("text-size settings scale real desktop and application text", async ({
-  page,
-}) => {
-  const previous = await page
-    .locator(".file-page-heading h1")
-    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  await launch(page, "settings");
-  await page
-    .getByRole("button", { name: "Display", exact: true })
-    .click();
-  await page
-    .getByRole("combobox", { name: "Desktop text size" })
-    .selectOption("1.15");
-  const changed = await page
-    .locator(".file-page-heading h1")
-    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-  expect(changed).toBeGreaterThan(previous);
-});''',
-              '''test("display scale defaults to 50 percent and adjusts without a native select dialog", async ({
-  page,
-}) => {
-  await launch(page, "settings");
-  await page
-    .getByRole("button", { name: "Display", exact: true })
-    .click();
-  const scale = page.getByRole("slider", { name: "Desktop display scale" });
-  await expect(scale).toHaveValue("50");
-  await scale.focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(scale).toHaveValue("55");
-  await expect(page.locator(".display-scale-slider")).toContainText("55%");
-  const applied = await page.locator(".desktop").evaluate((el) =>
-    getComputedStyle(el).getPropertyValue("--text-scale").trim(),
-  );
-  expect(applied).toBe("0.55");
-});''')
+              textwrap.dedent("""
+                  test("text-size settings scale real desktop and application text", async ({
+                    page,
+                  }) => {
+                    const previous = await page
+                      .locator(".file-page-heading h1")
+                      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+                    await launch(page, "settings");
+                    await page
+                      .getByRole("button", { name: "Display", exact: true })
+                      .click();
+                    await page
+                      .getByRole("combobox", { name: "Desktop text size" })
+                      .selectOption("1.15");
+                    const changed = await page
+                      .locator(".file-page-heading h1")
+                      .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+                    expect(changed).toBeGreaterThan(previous);
+                  });
+              """),
+              textwrap.dedent("""
+                  test("display scale defaults to 50 percent and adjusts without a native select dialog", async ({
+                    page,
+                  }) => {
+                    await launch(page, "settings");
+                    await page
+                      .getByRole("button", { name: "Display", exact: true })
+                      .click();
+                    const scale = page.getByRole("slider", { name: "Desktop display scale" });
+                    await expect(scale).toHaveValue("50");
+                    await scale.focus();
+                    await page.keyboard.press("ArrowRight");
+                    await expect(scale).toHaveValue("55");
+                    await expect(page.locator(".display-scale-slider")).toContainText("55%");
+                    const applied = await page.locator(".desktop").evaluate((el) =>
+                      getComputedStyle(el).getPropertyValue("--text-scale").trim(),
+                    );
+                    expect(applied).toBe("0.55");
+                  });
+              """))
           print("Set Development 8 display scale to 50%, replaced the native select with a range control, and added a regression test.")
           print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
           PY
