@@ -34,13 +34,6 @@ jobs:
           test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
-      - name: Upload extracted Development 8 source for targeted repair
-        uses: actions/upload-artifact@v4
-        with:
-          name: KK-DEX-development-8-source-inspection
-          path: ${{ env.PROJECT_ROOT }}/
-          include-hidden-files: true
-          retention-days: 1
 
       - name: Remove unsafe OpenGL query from NativeBridge background thread
         working-directory: ${{ env.PROJECT_ROOT }}
@@ -305,6 +298,75 @@ jobs:
             .file-content { padding: 16px 16px; }
           }
           """)
+          # Development 8: make the display scale a safe range control, defaulting to 50%.
+          replace_once("src/storage.ts", '  textScale: 0.9,', '  textScale: 0.5,')
+          replace_once("src/system.tsx",
+              '    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.textScale = 0.9;\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }',
+              '    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }\n    const displayScaleMigrated = readPersisted("desktop-display-scale-v107", false);\n    if (!displayScaleMigrated) {\n      saved.textScale = 0.5;\n      persist("desktop-display-scale-v107", true);\n    }')
+          replace_once("src/apps/SystemApps.tsx",
+              '''              <select
+                aria-label="Desktop text size"
+                value={p.textScale}
+                onChange={(e) =>
+                  setPreference("textScale", Number(e.target.value))
+                }
+              >
+                <option value=".9">Small (90%)</option>
+                <option value="1">Default (100%)</option>
+                <option value="1.15">Large (115%)</option>
+              </select>''',
+              '''              <div className="setting-slider display-scale-slider">
+                <input
+                  type="range"
+                  aria-label="Desktop display scale"
+                  min="50"
+                  max="100"
+                  step="5"
+                  value={Math.round(p.textScale * 100)}
+                  onChange={(e) =>
+                    setPreference("textScale", Number(e.target.value) / 100)
+                  }
+                />
+                <span>{Math.round(p.textScale * 100)}%</span>
+              </div>''')
+          replace_once("tests/integration.spec.ts",
+              '''test("text-size settings scale real desktop and application text", async ({
+  page,
+}) => {
+  const previous = await page
+    .locator(".file-page-heading h1")
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  await launch(page, "settings");
+  await page
+    .getByRole("button", { name: "Display", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Desktop text size" })
+    .selectOption("1.15");
+  const changed = await page
+    .locator(".file-page-heading h1")
+    .evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(changed).toBeGreaterThan(previous);
+});''',
+              '''test("display scale defaults to 50 percent and adjusts without a native select dialog", async ({
+  page,
+}) => {
+  await launch(page, "settings");
+  await page
+    .getByRole("button", { name: "Display", exact: true })
+    .click();
+  const scale = page.getByRole("slider", { name: "Desktop display scale" });
+  await expect(scale).toHaveValue("50");
+  await scale.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(scale).toHaveValue("55");
+  await expect(page.locator(".display-scale-slider")).toContainText("55%");
+  const applied = await page.locator(".desktop").evaluate((el) =>
+    getComputedStyle(el).getPropertyValue("--text-scale").trim(),
+  );
+  expect(applied).toBe("0.55");
+});''')
+          print("Set Development 8 display scale to 50%, replaced the native select with a range control, and added a regression test.")
           print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
           PY
 
@@ -369,11 +431,11 @@ jobs:
           source = path.read_text()
           if "versionCode = 1" not in source or 'versionName = "1.0.0"' not in source:
               raise SystemExit("Unexpected Development 8 version; refusing to change a different source.")
-          source = source.replace("versionCode = 1", "versionCode = 8", 1)
-          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.6"', 1)
+          source = source.replace("versionCode = 1", "versionCode = 9", 1)
+          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.7"', 1)
           path.write_text(source)
-          assert "versionCode = 8" in path.read_text()
-          print("Building KK DEX Development 8 version 1.0.6 (versionCode 8).")
+          assert "versionCode = 9" in path.read_text()
+          print("Building KK DEX Development 8 version 1.0.7 (versionCode 9).")
           PY
 
       - name: Build and lint the Android app
