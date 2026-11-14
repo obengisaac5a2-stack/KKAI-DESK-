@@ -130,14 +130,30 @@ jobs:
           """.replace("\n          ", "\n"))
           print(f"Patched {source}")
 
+          # Avoid the confirmed native SIGSEGV: GLES glGetString was called on
+          # a worker thread without a current EGL context. Replace GPU probing
+          # in NativeBridge with a harmless fallback string.
+          import re
+          bridge_files = list(root.rglob("NativeBridge.kt"))
+          if len(bridge_files) != 1:
+              raise SystemExit(f"Expected exactly one NativeBridge.kt, found {len(bridge_files)}")
+          bridge = bridge_files[0]
+          bridge_text = bridge.read_text()
+          gl_call = re.compile(r'\\b(?:[A-Za-z_][A-Za-z0-9_]*\\s*\\.\\s*)?glGetString\\s*\\([^)]*\\)')
+          bridge_text, replacements = gl_call.subn('"unknown"', bridge_text)
+          if replacements < 1:
+              raise SystemExit("No glGetString call found in NativeBridge.kt; refusing an unverified patch.")
+          bridge.write_text(bridge_text)
+          print(f"Removed {replacements} unsafe glGetString call(s) from {bridge}")
+
           gradle = source.parents[6] / "build.gradle.kts"
           text = gradle.read_text()
           if 'versionCode = 1' not in text or 'versionName = "1.0.0"' not in text:
               raise SystemExit("Unexpected Development 10 version metadata; refusing to bump it.")
-          text = text.replace("versionCode = 1", "versionCode = 2", 1)
-          text = text.replace('versionName = "1.0.0"', 'versionName = "1.0.1"', 1)
+          text = text.replace("versionCode = 1", "versionCode = 3", 1)
+          text = text.replace('versionName = "1.0.0"', 'versionName = "1.0.2"', 1)
           gradle.write_text(text)
-          print("Set test APK version to 1.0.1 (versionCode 2).")
+          print("Set test APK version to 1.0.2 (versionCode 3).")
           PY
 
       - name: Set up Node.js
@@ -194,14 +210,14 @@ jobs:
           APK="$(find android -type f -path '*/build/outputs/apk/*/*.apk' ! -name '*androidTest*' | head -n 1)"
           test -n "$APK"
           mkdir -p deliverables
-          cp "$APK" deliverables/KK-DEX-Development-10-Android16-Fix.apk
-          sha256sum deliverables/KK-DEX-Development-10-Android16-Fix.apk | tee deliverables/SHA256SUMS.txt
+          cp "$APK" deliverables/KK-DEX-Development-10-NativeCrash-Fix.apk
+          sha256sum deliverables/KK-DEX-Development-10-NativeCrash-Fix.apk | tee deliverables/SHA256SUMS.txt
           ls -lh deliverables/
 
       - name: Upload Development 10 Android 16 fixed APK
         uses: actions/upload-artifact@v4
         with:
-          name: KK-DEX-Development-10-Android16-Fix-APK
+          name: KK-DEX-Development-10-NativeCrash-Fix-APK
           path: ${{ env.PROJECT_ROOT }}/deliverables/
           if-no-files-found: error
           retention-days: 14
