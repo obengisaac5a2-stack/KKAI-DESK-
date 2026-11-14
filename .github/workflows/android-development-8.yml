@@ -34,6 +34,14 @@ jobs:
           test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
+      - name: Upload extracted Development 8 source for targeted repair
+        uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-source-inspection
+          path: ${{ env.PROJECT_ROOT }}/
+          include-hidden-files: true
+          retention-days: 1
+
       - name: Remove unsafe OpenGL query from NativeBridge background thread
         working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
