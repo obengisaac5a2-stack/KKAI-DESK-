@@ -45,7 +45,7 @@ jobs:
               raise SystemExit(f"Expected exactly one NativeBridge.kt in Development 8 source, found {len(matches)}")
           path = matches[0]
           source = path.read_text()
-          pattern = re.compile(r'\b(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?glGetString\s*\([^)]*\)')
+          pattern = re.compile(r'(?:\b[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)*glGetString\s*\([^)]*\)')
           source, count = pattern.subn('"unknown"', source)
           if count == 0:
               raise SystemExit(f"No glGetString call found in {path}; refusing to produce an unpatched APK")
