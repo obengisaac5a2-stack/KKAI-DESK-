@@ -131,10 +131,13 @@ jobs:
           if source.count(state_anchor) != 1:
               raise SystemExit("Could not locate the unique Android Apps launching state.")
           source = source.replace(state_anchor, state_anchor + '\\n  const [installing, setInstalling] = useState(false);', 1)
-          old_visible = '  const visible = apps.filter((app) => `${app.label} ${app.packageName}`.toLowerCase().includes(query.toLowerCase()));\n\n  if (!available)'
-          new_visible = '''  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));
-
-          const chooseAndInstallApk = async () => {
+          anchor = "  const visible = apps.filter("
+          if source.count(anchor) != 1:
+              raise SystemExit("Could not locate the unique installed-app filter.")
+          insert_at = source.find("\\n\\n  if (!available)", source.find(anchor))
+          if insert_at < 0:
+              raise SystemExit("Could not locate the Android Apps native-availability branch.")
+          handler = """  const chooseAndInstallApk = async () => {
             try {
               setInstalling(true);
               const selected = await pickFiles("*/*");
@@ -147,7 +150,7 @@ jobs:
                 return;
               }
               system.setDialog({
-                title: `Install ${apk.name}?`,
+                title: "Install " + apk.name + "?",
                 message: "KK DEX will hand this APK to Android's official package installer. Review the app identity, requested permissions and Play Protect warning before approving. KK DEX cannot silently install apps or bypass Android's checks.",
                 confirmLabel: "Continue to Android installer",
                 onConfirm: () => {
@@ -163,12 +166,8 @@ jobs:
             } finally {
               setInstalling(false);
             }
-          };
-
-          if (!available)'''
-          if source.count(old_visible) != 1:
-              raise SystemExit("Could not locate the unique installed-app filter block.")
-          source = source.replace(old_visible, new_visible, 1)
+          };"""
+          source = source[:insert_at] + "\\n\\n" + handler + source[insert_at:]
           old_button = '        <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>'
           new_button = '''        <div className="app-manager-actions">
                   <button className="secondary-button" onClick={() => void chooseAndInstallApk()} disabled={installing}><Package size={14} /> {installing ? "Opening picker…" : "Install APK"}</button>
