@@ -204,6 +204,100 @@ jobs:
           print("Added a direct APK picker and confirmation flow to the native Android Apps manager.")
           PY
 
+      - name: Correct Development 8 desktop density and window layout
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text()
+              if s.count(old) != 1:
+                  raise SystemExit(f"Expected one exact anchor in {path}: {old!r}")
+              p.write_text(s.replace(old, new, 1))
+
+          # Balanced initial window sizes for 960x540 and similar TV displays.
+          replace_once("src/registry.ts",
+              'app("pc", "This PC", "Your device and connected storage", "System", 820, 540)',
+              'app("pc", "This PC", "Your device and connected storage", "System", 760, 480, 560, 340)')
+          replace_once("src/registry.ts",
+              '    900,\n    584,\n    620,\n    380,',
+              '    780,\n    490,\n    560,\n    340,')
+          replace_once("src/registry.ts",
+              'app("browser", "Browser", "A window to the world", "Internet", 940, 610)',
+              'app("browser", "Browser", "A window to the world", "Internet", 820, 520, 580, 350)')
+          replace_once("src/registry.ts",
+              '    860,\n    580,\n    640,\n    380,',
+              '    760,\n    490,\n    560,\n    340,')
+          
+          # Compact defaults for desktop shortcuts and typography.
+          replace_once("src/storage.ts", '  textScale: 1,', '  textScale: 0.9,')
+          replace_once("src/storage.ts", '  iconSize: "medium",', '  iconSize: "small",')
+
+          # Reduce taskbar reservation consistently in window geometry.
+          replace_once("src/system.tsx", 'export const TASKBAR_HEIGHT = 64;', 'export const TASKBAR_HEIGHT = 56;')
+          replace_once("src/system.tsx", '...fitRect(900, 584),', '...fitRect(780, 490),')
+          # Clamp restored sessions so old oversized saved windows do not reopen oversized.
+          replace_once("src/system.tsx",
+              '  const width = Math.max(100, Math.min(rect.width, viewportWidth - 16));',
+              '  const width = Math.max(100, Math.min(rect.width, viewportWidth * 0.88, viewportWidth - 16));')
+          replace_once("src/system.tsx",
+              '    Math.min(rect.height, viewportHeight - TASKBAR_HEIGHT - 12),',
+              '    Math.min(rect.height, viewportHeight * 0.86, viewportHeight - TASKBAR_HEIGHT - 12),')
+
+          # Tighter shortcut grid so more apps fit without crowding.
+          replace_once("src/Desktop.tsx",
+              'const CELL_X = 94,\n  CELL_Y = 96,\n  LEFT = 20,\n  TOP = 26;',
+              'const CELL_X = 84,\n  CELL_Y = 84,\n  LEFT = 16,\n  TOP = 18;')
+
+          css = Path("src/index.css")
+          css.write_text(css.read_text().rstrip() + """
+
+          /* Development 8: compact, TV-friendly desktop density. */
+          .desktop-icons { inset-bottom: 56px; }
+          .window-layer { bottom: 56px; }
+          .taskbar { height: 56px; padding-left: 16px; padding-right: 12px; }
+          .taskbar-button { width: 40px; height: 40px; }
+          .taskbar-center { gap: 2px; }
+          .window-titlebar { height: 38px; min-height: 38px; }
+          .window-controls button { width: 38px; }
+          .settings-sidebar { width: 174px; min-width: 160px; padding-top: 18px; }
+          .settings-profile { margin-left: 15px; margin-right: 12px; }
+          .settings-search { margin: 16px 12px 12px; }
+          .settings-content { padding: 22px 24px 20px; }
+          .settings-content > h1 { font-size: calc(23px * var(--text-scale, 1)); }
+          .setting-row { padding: 14px 0; gap: 12px; }
+          .file-sidebar { width: 156px; min-width: 156px; }
+          .file-content { padding: 18px 20px; }
+          .desktop-icon { width: 72px; height: 76px; padding: 6px 2px 4px; gap: 4px; }
+          .desktop-icon > span:last-child { max-width: 68px; font-size: calc(10px * var(--text-scale, 1)); }
+          .desktop-icon .app-icon svg, .desktop-icon > svg { width: 32px; height: 32px; }
+          .desktop-icons.small .desktop-icon { height: 70px; padding-top: 6px; gap: 4px; }
+
+          @media (max-width: 1100px), (max-height: 700px) {
+            .desktop-brand { right: 22px; bottom: 76px; }
+            .desktop-brand > div { font-size: calc(22px * var(--text-scale, 1)); }
+            .desktop-icons, .window-layer { bottom: 56px; }
+            .taskbar { height: 56px; padding-left: 12px; padding-right: 8px; }
+            .taskbar-button { width: 38px; height: 38px; }
+            .window-titlebar { height: 36px; min-height: 36px; }
+            .window-controls button { width: 36px; }
+            .window-title { padding-left: 12px; }
+            .settings-sidebar { width: 160px; min-width: 150px; }
+            .settings-content { padding: 18px 18px 16px; }
+            .settings-content > h1 { font-size: calc(21px * var(--text-scale, 1)); }
+            .settings-description { margin-bottom: 16px; }
+            .setting-row { padding: 11px 0; }
+            .file-sidebar { width: 146px; min-width: 146px; }
+            .file-content { padding: 16px 16px; }
+          }
+          """)
+          print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
