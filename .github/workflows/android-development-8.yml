@@ -32,6 +32,27 @@ jobs:
           test -s "$ROOT/android/app/src/main/java/com/kkdex/desktop/BrowserActivity.kt"
           echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
 
+      - name: Remove unsafe OpenGL query from NativeBridge background thread
+        working-directory: ${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          matches = list(Path(".").rglob("NativeBridge.kt"))
+          if len(matches) != 1:
+              raise SystemExit(f"Expected exactly one NativeBridge.kt in Development 8 source, found {len(matches)}")
+          path = matches[0]
+          source = path.read_text()
+          pattern = re.compile(r'\b(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?glGetString\s*\([^)]*\)')
+          source, count = pattern.subn('"unknown"', source)
+          if count == 0:
+              raise SystemExit(f"No glGetString call found in {path}; refusing to produce an unpatched APK")
+          path.write_text(source)
+          print(f"Replaced {count} unsafe OpenGL glGetString call(s) in {path}")
+          PY
+
       - name: Repair Version 8 Android Kotlin compile errors
         working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
@@ -156,11 +177,11 @@ jobs:
           source = path.read_text()
           if "versionCode = 1" not in source or 'versionName = "1.0.0"' not in source:
               raise SystemExit("Unexpected Development 8 version; refusing to change a different source.")
-          source = source.replace("versionCode = 1", "versionCode = 5", 1)
+          source = source.replace("versionCode = 1", "versionCode = 6", 1)
           source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.4"', 1)
           path.write_text(source)
-          assert "versionCode = 5" in path.read_text()
-          print("Building KK DEX 1.0.4 (versionCode 5).")
+          assert "versionCode = 6" in path.read_text()
+          print("Building KK DEX Development 8 version 1.0.4 (versionCode 6).")
           PY
 
       - name: Build and lint the Android app
@@ -190,7 +211,7 @@ jobs:
       - name: Upload Development 8 APK and verification reports
         uses: actions/upload-artifact@v4
         with:
-          name: KK-DEX-development-8-APK-and-reports
+          name: KK-DEX-development-8-NativeBridge-crash-fix-APK-and-reports
           path: |
             ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk
             ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk.sha256
