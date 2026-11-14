@@ -241,7 +241,7 @@ jobs:
               '  const [preferences, setPreferences] = useState<Preferences>(() => {\n    const saved = { ...readPersisted<Preferences>("preferences", defaultPreferences) };\n    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.textScale = 0.9;\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }\n    return { ...defaultPreferences, ...saved };\n  });')
 
           # Reduce taskbar reservation consistently in window geometry.
-          replace_once("src/system.tsx", 'export const TASKBAR_HEIGHT = 64;', 'export const TASKBAR_HEIGHT = 56;')
+          replace_once("src/system.tsx", 'export const TASKBAR_HEIGHT = 56;', 'export const TASKBAR_HEIGHT = 64;')
           replace_once("src/system.tsx", '...fitRect(900, 584),', '...fitRect(780, 490),')
           # Clamp restored sessions so old oversized saved windows do not reopen oversized.
           replace_once("src/system.tsx",
