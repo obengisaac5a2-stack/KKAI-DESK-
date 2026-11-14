@@ -130,11 +130,11 @@ jobs:
           state_anchor = '  const [launching, setLaunching] = useState<string | null>(null);'
           if source.count(state_anchor) != 1:
               raise SystemExit("Could not locate the unique Android Apps launching state.")
-          source = source.replace(state_anchor, state_anchor + '\\n  const [installing, setInstalling] = useState(false);', 1)
+          source = source.replace(state_anchor, state_anchor + '\n  const [installing, setInstalling] = useState(false);', 1)
           anchor = "  const visible = apps.filter("
           if source.count(anchor) != 1:
               raise SystemExit("Could not locate the unique installed-app filter.")
-          insert_at = source.find("\\n\\n  if (!available)", source.find(anchor))
+          insert_at = source.find("\n\n  if (!available)", source.find(anchor))
           if insert_at < 0:
               raise SystemExit("Could not locate the Android Apps native-availability branch.")
           handler = """  const chooseAndInstallApk = async () => {
@@ -167,7 +167,7 @@ jobs:
               setInstalling(false);
             }
           };"""
-          source = source[:insert_at] + "\\n\\n" + handler + source[insert_at:]
+          source = source[:insert_at] + "\n\n" + handler + source[insert_at:]
           old_button = '        <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>'
           new_button = '''        <div className="app-manager-actions">
                   <button className="secondary-button" onClick={() => void chooseAndInstallApk()} disabled={installing}><Package size={14} /> {installing ? "Opening picker…" : "Install APK"}</button>
