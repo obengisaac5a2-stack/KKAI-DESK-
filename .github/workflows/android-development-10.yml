@@ -139,7 +139,7 @@ jobs:
               raise SystemExit(f"Expected exactly one NativeBridge.kt, found {len(bridge_files)}")
           bridge = bridge_files[0]
           bridge_text = bridge.read_text()
-          gl_call = re.compile(r'\\b(?:[A-Za-z_][A-Za-z0-9_]*\\s*\\.\\s*)?glGetString\\s*\\([^)]*\\)')
+          gl_call = re.compile(r'\b(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)?glGetString\s*\([^)]*\)')
           bridge_text, replacements = gl_call.subn('"unknown"', bridge_text)
           if replacements < 1:
               raise SystemExit("No glGetString call found in NativeBridge.kt; refusing an unverified patch.")
