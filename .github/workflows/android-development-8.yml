@@ -1,10 +1,12 @@
 name: KK DEX Development 8 verification and APK
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
       - ".github/workflows/android-development-8.yml"
+      - "kk-dex-desktop-os-development (8).zip"
 
 permissions:
   contents: read
@@ -116,6 +118,94 @@ jobs:
           print("APK files now bypass Archive Manager and reach the existing Android installer confirmation.")
           PY
 
+      - name: Add a direct APK installer to Android Apps
+        working-directory: \${{ env.PROJECT_ROOT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("src/apps/AndroidApps.tsx")
+          source = path.read_text()
+          old_state = '  const [launching, setLaunching] = useState<string | null>(null);\n  const available = nativeAvailable();'
+          new_state = '  const [launching, setLaunching] = useState<string | null>(null);\n  const [installing, setInstalling] = useState(false);\n  const available = nativeAvailable();'
+          if source.count(old_state) != 1:
+              raise SystemExit("Could not locate the unique Android Apps state block.")
+          source = source.replace(old_state, new_state, 1)
+          old_visible = '  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));\n\n  if (!available)'
+          new_visible = '''  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));
+
+          const chooseAndInstallApk = async () => {
+            try {
+              setInstalling(true);
+              const selected = await pickFiles("*/*");
+              const apk = selected.find((file) =>
+                file.name.toLowerCase().endsWith(".apk") ||
+                file.mime === "application/vnd.android.package-archive",
+              );
+              if (!apk) {
+                system.notify("No APK selected", "Choose an .apk file from Android storage. No app was installed.", "appmanager");
+                return;
+              }
+              system.setDialog({
+                title: \`Install \${apk.name}?\`,
+                message: "KK DEX will hand this APK to Android's official package installer. Review the app identity, requested permissions and Play Protect warning before approving. KK DEX cannot silently install apps or bypass Android's checks.",
+                confirmLabel: "Continue to Android installer",
+                onConfirm: () => {
+                  void installApkUri(apk.uri)
+                    .then((message) => system.notify("Android installer", message, "appmanager"))
+                    .catch((cause) => report("APK installation could not start", cause));
+                },
+              });
+            } catch (cause) {
+              if (!(cause instanceof Error) || !/cancel|picker/i.test(cause.message)) {
+                report("Could not choose an APK", cause);
+              }
+            } finally {
+              setInstalling(false);
+            }
+          };
+
+          if (!available)'''
+          if source.count(old_visible) != 1:
+              raise SystemExit("Could not locate the unique installed-app filter block.")
+          source = source.replace(old_visible, new_visible, 1)
+          old_button = '        <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>'
+          new_button = '''        <div className="app-manager-actions">
+                  <button className="secondary-button" onClick={() => void chooseAndInstallApk()} disabled={installing}><Package size={14} /> {installing ? "Opening picker…" : "Install APK"}</button>
+                  <button className="secondary-button" onClick={() => void load()} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""} /> Refresh</button>
+                </div>'''
+          if source.count(old_button) != 1:
+              raise SystemExit("Could not locate the unique Android Apps refresh button.")
+          source = source.replace(old_button, new_button, 1)
+          path.write_text(source)
+
+          css = Path("src/index.css")
+          styles = """
+          /* Development 8: keep APK installation distinct from app refresh. */
+          .app-manager-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+          @media (max-width: 620px) {
+            .app-manager .panel-heading {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+            .app-manager-actions {
+              justify-content: flex-start;
+            }
+          }
+          """
+          css_source = css.read_text()
+          if ".app-manager-actions {" not in css_source:
+              css.write_text(css_source.rstrip() + "\n\n" + styles.lstrip())
+          print("Added a direct APK picker and confirmation flow to the native Android Apps manager.")
+          PY
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -177,11 +267,11 @@ jobs:
           source = path.read_text()
           if "versionCode = 1" not in source or 'versionName = "1.0.0"' not in source:
               raise SystemExit("Unexpected Development 8 version; refusing to change a different source.")
-          source = source.replace("versionCode = 1", "versionCode = 6", 1)
-          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.4"', 1)
+          source = source.replace("versionCode = 1", "versionCode = 7", 1)
+          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.5"', 1)
           path.write_text(source)
           assert "versionCode = 6" in path.read_text()
-          print("Building KK DEX Development 8 version 1.0.4 (versionCode 6).")
+          print("Building KK DEX Development 8 version 1.0.5 (versionCode 7).")
           PY
 
       - name: Build and lint the Android app
@@ -211,7 +301,7 @@ jobs:
       - name: Upload Development 8 APK and verification reports
         uses: actions/upload-artifact@v4
         with:
-          name: KK-DEX-development-8-NativeBridge-crash-fix-APK-and-reports
+          name: KK-DEX-development-8-app-installer-APK-and-reports
           path: |
             ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk
             ${{ env.PROJECT_ROOT }}/deliverables/kkdex-debug.apk.sha256
