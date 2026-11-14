@@ -236,6 +236,9 @@ jobs:
           # Compact defaults for desktop shortcuts and typography.
           replace_once("src/storage.ts", '  textScale: 1,', '  textScale: 0.9,')
           replace_once("src/storage.ts", '  iconSize: "medium",', '  iconSize: "small",')
+          replace_once("src/system.tsx",
+              '  const [preferences, setPreferences] = useState<Preferences>(() => ({\n    ...defaultPreferences,\n    ...readPersisted("preferences", defaultPreferences),\n  }));',
+              '  const [preferences, setPreferences] = useState<Preferences>(() => {\n    const saved = { ...readPersisted<Preferences>("preferences", defaultPreferences) };\n    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.textScale = 0.9;\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }\n    return { ...defaultPreferences, ...saved };\n  });')
 
           # Reduce taskbar reservation consistently in window geometry.
           replace_once("src/system.tsx", 'export const TASKBAR_HEIGHT = 64;', 'export const TASKBAR_HEIGHT = 56;')
