@@ -127,11 +127,10 @@ jobs:
           from pathlib import Path
           path = Path("src/apps/AndroidApps.tsx")
           source = path.read_text()
-          old_state = '  const [launching, setLaunching] = useState<string | null>(null);\n  const available = nativeAvailable();'
-          new_state = '  const [launching, setLaunching] = useState<string | null>(null);\n  const [installing, setInstalling] = useState(false);\n  const available = nativeAvailable();'
-          if source.count(old_state) != 1:
-              raise SystemExit("Could not locate the unique Android Apps state block.")
-          source = source.replace(old_state, new_state, 1)
+          state_anchor = '  const [launching, setLaunching] = useState<string | null>(null);'
+          if source.count(state_anchor) != 1:
+              raise SystemExit("Could not locate the unique Android Apps launching state.")
+          source = source.replace(state_anchor, state_anchor + '\\n  const [installing, setInstalling] = useState(false);', 1)
           old_visible = '  const visible = apps.filter((app) => `${app.label} ${app.packageName}`.toLowerCase().includes(query.toLowerCase()));\n\n  if (!available)'
           new_visible = '''  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));
 
