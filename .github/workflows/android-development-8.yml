@@ -119,7 +119,7 @@ jobs:
           PY
 
       - name: Add a direct APK installer to Android Apps
-        working-directory: \${{ env.PROJECT_ROOT }}
+        working-directory: ${{ env.PROJECT_ROOT }}
         shell: bash
         run: |
           set -euo pipefail
@@ -132,7 +132,7 @@ jobs:
           if source.count(old_state) != 1:
               raise SystemExit("Could not locate the unique Android Apps state block.")
           source = source.replace(old_state, new_state, 1)
-          old_visible = '  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));\n\n  if (!available)'
+          old_visible = '  const visible = apps.filter((app) => `${app.label} ${app.packageName}`.toLowerCase().includes(query.toLowerCase()));\n\n  if (!available)'
           new_visible = '''  const visible = apps.filter((app) => \`\${app.label} \${app.packageName}\`.toLowerCase().includes(query.toLowerCase()));
 
           const chooseAndInstallApk = async () => {
@@ -148,7 +148,7 @@ jobs:
                 return;
               }
               system.setDialog({
-                title: \`Install \${apk.name}?\`,
+                title: `Install ${apk.name}?`,
                 message: "KK DEX will hand this APK to Android's official package installer. Review the app identity, requested permissions and Play Protect warning before approving. KK DEX cannot silently install apps or bypass Android's checks.",
                 confirmLabel: "Continue to Android installer",
                 onConfirm: () => {
