@@ -1,10 +1,12 @@
 name: Inspect KK DEX Development 8 archive
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
       - ".github/workflows/extract-development-8.yml"
+      - "kk-dex-desktop-os-development (8).zip"
 
 permissions:
   contents: read
