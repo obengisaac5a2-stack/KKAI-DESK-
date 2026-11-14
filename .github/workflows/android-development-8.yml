@@ -305,31 +305,35 @@ jobs:
               '    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.textScale = 0.9;\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }',
               '    const densityMigrated = readPersisted("desktop-density-v106", false);\n    if (!densityMigrated) {\n      saved.iconSize = "small";\n      persist("desktop-density-v106", true);\n    }\n    const displayScaleMigrated = readPersisted("desktop-display-scale-v107", false);\n    if (!displayScaleMigrated) {\n      saved.textScale = 0.5;\n      persist("desktop-display-scale-v107", true);\n    }')
           replace_once("src/apps/SystemApps.tsx",
-              '''              <select
-                aria-label="Desktop text size"
-                value={p.textScale}
-                onChange={(e) =>
-                  setPreference("textScale", Number(e.target.value))
-                }
-              >
-                <option value=".9">Small (90%)</option>
-                <option value="1">Default (100%)</option>
-                <option value="1.15">Large (115%)</option>
-              </select>''',
-              '''              <div className="setting-slider display-scale-slider">
-                <input
-                  type="range"
-                  aria-label="Desktop display scale"
-                  min="50"
-                  max="100"
-                  step="5"
-                  value={Math.round(p.textScale * 100)}
-                  onChange={(e) =>
-                    setPreference("textScale", Number(e.target.value) / 100)
-                  }
-                />
-                <span>{Math.round(p.textScale * 100)}%</span>
-              </div>''')
+              textwrap.indent(textwrap.dedent("""
+                  <select
+                    aria-label="Desktop text size"
+                    value={p.textScale}
+                    onChange={(e) =>
+                      setPreference("textScale", Number(e.target.value))
+                    }
+                  >
+                    <option value=".9">Small (90%)</option>
+                    <option value="1">Default (100%)</option>
+                    <option value="1.15">Large (115%)</option>
+                  </select>
+              """), "              "),
+              textwrap.indent(textwrap.dedent("""
+                  <div className="setting-slider display-scale-slider">
+                    <input
+                      type="range"
+                      aria-label="Desktop display scale"
+                      min="50"
+                      max="100"
+                      step="5"
+                      value={Math.round(p.textScale * 100)}
+                      onChange={(e) =>
+                        setPreference("textScale", Number(e.target.value) / 100)
+                      }
+                    />
+                    <span>{Math.round(p.textScale * 100)}%</span>
+                  </div>
+              """), "              "))
           replace_once("tests/integration.spec.ts",
               textwrap.dedent("""
                   test("text-size settings scale real desktop and application text", async ({
