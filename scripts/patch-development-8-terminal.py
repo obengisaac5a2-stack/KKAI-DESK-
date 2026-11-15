@@ -105,12 +105,7 @@ p.write_text(s)
 
 replace_once("src/types.ts",
 '''      execute?: (command: string) => Promise<string>;''',
-'''      execute?: (command: string) => Promise<{
-        output: string;
-        workingDirectory?: string;
-        exitCode: number;
-        timedOut?: boolean;
-      }>;''',
+'''      execute?: (command: string) => Promise<any>;''',
 "native execute type")
 
 replace_once("src/android/native.ts",
