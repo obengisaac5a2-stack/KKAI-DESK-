@@ -12,6 +12,9 @@ def replace_once(path, old, new, label):
         raise SystemExit(f"{label}: expected one exact match in {path}, found {count}")
     file.write_text(source.replace(old, new, 1))
 
+def patch(path, old, new, label):
+    replace_once(path, old, new, label)
+
 p = root / "src/apps/Productivity.tsx"
 s = p.read_text()
 bt = chr(96)
