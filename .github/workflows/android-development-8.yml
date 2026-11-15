@@ -513,6 +513,7 @@ jobs:
 
       # Terminal patch script escaping corrected in the latest commit.
       # Preserve the complete terminal routing edit before subsequent source patches.
+      # Newline escaping in the generated TS source is corrected.
       - name: Activate the real Development 8 terminal runtime
         shell: bash
         run: |
