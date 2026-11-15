@@ -550,11 +550,11 @@ jobs:
           source = path.read_text()
           if "versionCode = 1" not in source or 'versionName = "1.0.0"' not in source:
               raise SystemExit("Unexpected Development 8 version; refusing to change a different source.")
-          source = source.replace("versionCode = 1", "versionCode = 9", 1)
-          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.7"', 1)
+          source = source.replace("versionCode = 1", "versionCode = 10", 1)
+          source = source.replace('versionName = "1.0.0"', 'versionName = "1.0.8"', 1)
           path.write_text(source)
-          assert "versionCode = 9" in path.read_text()
-          print("Building KK DEX Development 8 version 1.0.7 (versionCode 9).")
+          assert "versionCode = 10" in path.read_text()
+          print("Building KK DEX Development 8 version 1.0.8 (versionCode 10).")
           PY
 
       - name: Build and lint the Android app
