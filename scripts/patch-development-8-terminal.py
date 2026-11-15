@@ -324,31 +324,26 @@ patch("tests/android-native.spec.ts",
 
 
 # Make the terminal usable on Android phones: explicit Run control and IME action.
-terminal_input = re.search(
-    r"""<(input|textarea)\\b(?=[^>]*aria-label=["']Terminal command["'])[^>]*>(?:[\\s\\S]*?</textarea>)?""",
-    s,
-)
-if not terminal_input:
-    raise SystemExit("Could not locate the terminal command field for the mobile keyboard fix.")
-input_tag = terminal_input.group(0)
-opening = re.match(r"<(input|textarea)\\b[^>]*>", input_tag)
-if not opening:
-    raise SystemExit("Could not parse the terminal command field.")
-opening_tag = opening.group(0)
-if "enterKeyHint=" not in opening_tag:
-    attrs = ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false}'
-    if opening.group(1) == "input" and opening_tag.rstrip().endswith("/>"):
-        opening_tag = opening_tag.rstrip()[:-2] + attrs + " />"
-    else:
-        opening_tag = opening_tag[:-1] + attrs + ">"
-    input_tag = opening_tag + input_tag[opening.end():]
+label_pos = s.find('aria-label="Terminal command"')
+if label_pos < 0:
+    raise SystemExit("Could not locate the terminal command field label.")
+input_start = s.rfind("<input", 0, label_pos)
+if input_start < 0:
+    raise SystemExit("Could not locate the terminal command input element.")
+input_end = s.find("/>", label_pos)
+if input_end < 0:
+    raise SystemExit("Could not locate the end of the terminal command input element.")
+input_end += 2
+input_tag = s[input_start:input_end]
+if "enterKeyHint=" not in input_tag:
+    input_tag = input_tag[:-2] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} />'
 run_button = """
       <button
         type="button"
         className="terminal-run-button"
         aria-label="Run command"
         onClick={() => {
-          const commandInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>('[aria-label="Terminal command"]');
+          const commandInput = document.querySelector<HTMLInputElement>('input[aria-label="Terminal command"]');
           if (!commandInput) return;
           commandInput.focus();
           commandInput.dispatchEvent(new KeyboardEvent("keydown", {
@@ -360,7 +355,7 @@ run_button = """
       >
         Run
       </button>"""
-s = s[:terminal_input.start()] + input_tag + run_button + s[terminal_input.end():]
+s = s[:input_start] + input_tag + run_button + s[input_end:]
 css = root / "src/index.css"
 css.write_text(css.read_text().rstrip() + """
 
@@ -383,7 +378,7 @@ css.write_text(css.read_text().rstrip() + """
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
-[aria-label="Terminal command"] {
+input[aria-label="Terminal command"] {
   min-width: 0;
   min-height: 46px;
   font-size: 16px !important;
@@ -396,7 +391,7 @@ css.write_text(css.read_text().rstrip() + """
     border-radius: 12px;
     font-size: 16px;
   }
-  [aria-label="Terminal command"] {
+  input[aria-label="Terminal command"] {
     min-height: 52px;
     padding-inline: 14px;
   }
