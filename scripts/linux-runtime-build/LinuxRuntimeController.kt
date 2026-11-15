@@ -5,6 +5,13 @@ import android.os.Build
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.zip.GZIPInputStream
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -62,34 +69,7 @@ class LinuxRuntimeController(private val context: Context) {
 
         try {
             downloadAndVerify(archive)
-            val extract = ProcessBuilder(
-                "/system/bin/toybox", "tar", "-xzf", archive.absolutePath, "-C", staging.absolutePath,
-            ).redirectErrorStream(true).start()
-            val extractOutput = ByteArrayOutputStream()
-            val drain = Thread {
-                extract.inputStream.use { input ->
-                    val buffer = ByteArray(8192)
-                    var total = 0
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count <= 0) break
-                        if (total < MAX_OUTPUT_BYTES) {
-                            val accepted = minOf(count, MAX_OUTPUT_BYTES - total)
-                            extractOutput.write(buffer, 0, accepted)
-                            total += accepted
-                        }
-                    }
-                }
-            }.apply { isDaemon = true; start() }
-            val finished = extract.waitFor(EXTRACT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            if (!finished) {
-                extract.destroyForcibly()
-                throw IllegalStateException("Debian extraction exceeded its time limit.")
-            }
-            drain.join(3000)
-            if (extract.exitValue() != 0) {
-                throw IllegalStateException("Android could not unpack the Debian filesystem: " + extractOutput.toString("UTF-8"))
-            }
+            extractDebianArchive(archive, staging)
 
             if (!File(staging, "usr/bin/apt-get").isFile ||
                 !File(staging, "usr/bin/dpkg").isFile ||
@@ -216,6 +196,84 @@ class LinuxRuntimeController(private val context: Context) {
             .put("workingDirectory", currentDirectory)
     }
 
+    /**
+     * Extract the Debian tarball in-process. Android's toybox tar can reject
+     * hard-link entries in container rootfs archives; Commons Compress parses
+     * GNU/PAX tar metadata consistently and lets us safely copy hard links.
+     */
+    private fun extractDebianArchive(archive: File, destination: File) {
+        val pendingHardLinks = mutableListOf<Pair<File, String>>()
+        var entries = 0
+        GZIPInputStream(FileInputStream(archive), 64 * 1024).use { gzip ->
+            TarArchiveInputStream(gzip).use { tar ->
+                var entry: TarArchiveEntry? = tar.nextTarEntry
+                while (entry != null) {
+                    if (++entries > MAX_TAR_ENTRIES) {
+                        throw IllegalStateException("Debian archive contains too many filesystem entries.")
+                    }
+                    val name = entry.name.trimStart('/')
+                    if (name.isNotEmpty()) {
+                        val target = File(destination, name).canonicalFile
+                        val root = destination.canonicalFile
+                        if (target != root && !target.path.startsWith(root.path + File.separator)) {
+                            throw IllegalStateException("Rejected an unsafe path in the Debian archive: " + entry.name)
+                        }
+                        when {
+                            entry.isDirectory -> {
+                                if (!target.exists() && !target.mkdirs()) {
+                                    throw IllegalStateException("Could not create Debian directory: " + entry.name)
+                                }
+                                applyArchiveMode(target, entry.mode, true)
+                            }
+                            entry.isSymbolicLink -> {
+                                target.parentFile?.mkdirs()
+                                if (target.exists() || Files.isSymbolicLink(target.toPath())) target.delete()
+                                android.system.Os.symlink(entry.linkName, target.absolutePath)
+                            }
+                            entry.isLink -> {
+                                target.parentFile?.mkdirs()
+                                pendingHardLinks += target to entry.linkName
+                            }
+                            entry.isFile -> {
+                                target.parentFile?.mkdirs()
+                                FileOutputStream(target).use { output -> tar.copyTo(output, 64 * 1024) }
+                                applyArchiveMode(target, entry.mode, false)
+                            }
+                            else -> {
+                                // Device nodes, sockets and FIFOs are not needed in an
+                                // unprivileged PRoot rootfs; PRoot binds Android /dev,/proc,/sys.
+                            }
+                        }
+                    }
+                    entry = tar.nextTarEntry
+                }
+            }
+        }
+
+        pendingHardLinks.forEach { (target, linkName) ->
+            val sourceName = linkName.trimStart('/')
+            val source = File(destination, sourceName).canonicalFile
+            val root = destination.canonicalFile
+            if (source != root && !source.path.startsWith(root.path + File.separator)) {
+                throw IllegalStateException("Rejected an unsafe Debian hard-link target: " + linkName)
+            }
+            if (!source.isFile) {
+                throw IllegalStateException("Debian hard-link target was not extracted: " + linkName)
+            }
+            target.parentFile?.mkdirs()
+            Files.copy(source.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            target.setReadable(source.canRead(), false)
+            target.setWritable(source.canWrite(), false)
+            target.setExecutable(source.canExecute(), false)
+        }
+    }
+
+    private fun applyArchiveMode(file: File, mode: Int, directory: Boolean) {
+        file.setReadable((mode and 0b100100100) != 0, false)
+        file.setWritable((mode and 0b010010010) != 0, false)
+        file.setExecutable(directory || (mode and 0b001001001) != 0, false)
+    }
+
     private fun downloadAndVerify(destination: File) {
         val url = URL(ROOTFS_URL)
         val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -285,7 +343,7 @@ class LinuxRuntimeController(private val context: Context) {
         private const val ROOTFS_SHA256 = "55da9c092deae2c7b4e2e44fe06074eef1783b000b69f2ed020d776db5358b32"
         private const val ROOTFS_BYTES = 30_214_040L
         private const val COMMAND_TIMEOUT_SECONDS = 300L
-        private const val EXTRACT_TIMEOUT_SECONDS = 240L
+        private const val MAX_TAR_ENTRIES = 250_000
         private const val MAX_OUTPUT_BYTES = 512 * 1024
         private const val MAX_COMMAND_LENGTH = 8192
     }
