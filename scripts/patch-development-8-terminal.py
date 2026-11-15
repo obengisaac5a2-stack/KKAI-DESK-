@@ -54,7 +54,9 @@ new = '''    const raw = command.trim();
       }
       return;
     }'''
-replace_once("src/apps/Productivity.tsx", old, new, "default native shell routing")
+if s.count(old) != 1:
+    raise SystemExit("Default native shell routing anchor was not unique.")
+s = s.replace(old, new, 1)
 
 replace_once("src/apps/Productivity.tsx",
 '''  const [cwd, setCwd] = useState("documents");
