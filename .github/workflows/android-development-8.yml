@@ -383,7 +383,7 @@ jobs:
               document.querySelector(".desktop")?.classList.contains("fullscreen-layout") ?? false,
             );''')
           replace_once("src/apps/SystemApps.tsx",
-              textwrap.dedent("""
+              textwrap.indent(textwrap.dedent("""
                     <button
                       className="secondary-button"
                       onClick={async () => {
@@ -402,8 +402,8 @@ jobs:
                       <Maximize size={14} />
                       Toggle full screen
                     </button>
-              """),
-              textwrap.dedent("""
+              """), "              "),
+              textwrap.indent(textwrap.dedent("""
                     <button
                       className="secondary-button"
                       aria-pressed={fullscreenLayout}
@@ -417,7 +417,7 @@ jobs:
                       <Maximize size={14} />
                       {fullscreenLayout ? "Exit full screen" : "Toggle full screen"}
                     </button>
-              """))
+              """), "              "))
           css = Path("src/index.css")
           fullscreen_css = """
           /* Development 8: native-safe full-screen desktop layout (no WebView Fullscreen API). */
