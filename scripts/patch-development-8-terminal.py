@@ -159,6 +159,10 @@ s, legacy_count = legacy_shell_print.subn(
     s,
 )
 print(f"Updated {legacy_count} remaining legacy shell-output call(s).")
+print("Terminal TypeScript diagnostic context:")
+for line_number, line in enumerate(s.splitlines(), 1):
+    if 750 <= line_number <= 785:
+        print(f"{line_number}: {line}")
 
 controller = root / "android/app/src/main/java/com/kkdex/desktop/TerminalController.kt"
 source = controller.read_text()
