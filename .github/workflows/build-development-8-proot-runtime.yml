@@ -45,6 +45,26 @@ jobs:
           test -s "$RUNNER_TEMP/proot-output/libproot-loader.so"
           test -s "$RUNNER_TEMP/proot-output/libtalloc.so"
           cat "$RUNNER_TEMP/proot-output/SHA256SUMS"
+      - name: Verify the pinned Debian Trixie ARM64 root filesystem
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/linux-runtime-build/debian-rootfs.lock
+          curl -fL --retry 3 "$DEBIAN_ROOTFS_URL" -o "$RUNNER_TEMP/debian-rootfs.tar.gz"
+          echo "$DEBIAN_ROOTFS_SHA256  $RUNNER_TEMP/debian-rootfs.tar.gz" | sha256sum -c -
+          test "$(stat -c %s "$RUNNER_TEMP/debian-rootfs.tar.gz")" = "$DEBIAN_ROOTFS_BYTES"
+          tar -tzf "$RUNNER_TEMP/debian-rootfs.tar.gz" | grep -E '^(etc/os-release|usr/bin/apt-get|usr/bin/dpkg|bin/bash)
+          path: |
+            ${{ runner.temp }}/proot-output/libproot.so
+            ${{ runner.temp }}/proot-output/libproot-loader.so
+            ${{ runner.temp }}/proot-output/libtalloc.so
+            ${{ runner.temp }}/proot-output/SHA256SUMS
+            ${{ runner.temp }}/proot-output/COPYING.proot
+            ${{ runner.temp }}/proot-output/LICENSE.talloc
+            ${{ runner.temp }}/proot-output/LICENSE.libandroid-shmem
+          if-no-files-found: error
+          retention-days: 14
+
       - uses: actions/upload-artifact@v4
         with:
           name: KK-DEX-development-8-proot-arm64-runtime
