@@ -47,6 +47,8 @@ jobs:
           test -s "$RUNNER_TEMP/proot-output/libproot-loader.so"
           test -s "$RUNNER_TEMP/proot-output/libtalloc.so"
           cat "$RUNNER_TEMP/proot-output/SHA256SUMS"
+          # Docker writes these files as root; restore runner-readable permissions before upload.
+          sudo chmod -R a+rX "$RUNNER_TEMP/proot-output"
 
       - name: Verify the pinned Debian Trixie ARM64 root filesystem
         shell: bash
