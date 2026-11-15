@@ -37,7 +37,7 @@ class LinuxRuntimeController(private val context: Context) {
                 "Debian 13.7 ARM64 is installed. PRoot is ready. The Linux prompt runs as fake root inside Debian; Android remains unrooted.\nCurrent Linux directory: $currentDirectory\nTry: apt-get update"
             } else {
                 "Debian is not installed yet. Runtime binaries: " +
-                    if (proot.isFile && loader.isFile && talloc.isFile) "present" else "missing" +
+                    (if (proot.isFile && loader.isFile && talloc.isFile) "present" else "missing") +
                     ". Run: linux install"
             },
             0,
@@ -141,13 +141,12 @@ class LinuxRuntimeController(private val context: Context) {
         val command = commandValue.trim()
         if (command.isEmpty()) throw IllegalArgumentException("No Linux command was provided.")
         if (command.length > MAX_COMMAND_LENGTH) throw IllegalArgumentException("Linux command is too long.")
-        if (!isInstalled()) throw IllegalStateException("Debian is not installed. Run: linux install")
-
         if (command == "linux status") return status()
         if (command == "linux reset") return reset()
         if (command == "linux help" || command == "linux") {
             return result("Linux commands:\n  linux install  Download and install Debian 13.7 ARM64\n  linux status   Check the Debian runtime\n  linux reset    Remove the Debian filesystem\nAfter installation, ordinary terminal commands run inside Debian. Use android <command> for the Android app shell.", 0, "KK DEX Linux help")
         }
+        if (!isInstalled()) throw IllegalStateException("Debian is not installed. Run: linux install")
 
         val cd = Regex("^cd(?:\\s+(.+))?$").matchEntire(command)
         if (cd != null) {
