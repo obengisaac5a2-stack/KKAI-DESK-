@@ -53,7 +53,32 @@ jobs:
           curl -fL --retry 3 "$DEBIAN_ROOTFS_URL" -o "$RUNNER_TEMP/debian-rootfs.tar.gz"
           echo "$DEBIAN_ROOTFS_SHA256  $RUNNER_TEMP/debian-rootfs.tar.gz" | sha256sum -c -
           test "$(stat -c %s "$RUNNER_TEMP/debian-rootfs.tar.gz")" = "$DEBIAN_ROOTFS_BYTES"
-          tar -tzf "$RUNNER_TEMP/debian-rootfs.tar.gz" | grep -E '^(etc/os-release|usr/bin/apt-get|usr/bin/dpkg|bin/bash)
+          tar -tzf "$RUNNER_TEMP/debian-rootfs.tar.gz" | grep -E '(^|/)(etc/os-release|usr/bin/apt-get|usr/bin/dpkg|bin/bash)
+          path: |
+            ${{ runner.temp }}/proot-output/libproot.so
+            ${{ runner.temp }}/proot-output/libproot-loader.so
+            ${{ runner.temp }}/proot-output/libtalloc.so
+            ${{ runner.temp }}/proot-output/SHA256SUMS
+            ${{ runner.temp }}/proot-output/COPYING.proot
+            ${{ runner.temp }}/proot-output/LICENSE.talloc
+            ${{ runner.temp }}/proot-output/LICENSE.libandroid-shmem
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-proot-arm64-runtime
+          path: |
+            ${{ runner.temp }}/proot-output/libproot.so
+            ${{ runner.temp }}/proot-output/libproot-loader.so
+            ${{ runner.temp }}/proot-output/libtalloc.so
+            ${{ runner.temp }}/proot-output/SHA256SUMS
+            ${{ runner.temp }}/proot-output/COPYING.proot
+            ${{ runner.temp }}/proot-output/LICENSE.talloc
+            ${{ runner.temp }}/proot-output/LICENSE.libandroid-shmem
+          if-no-files-found: error
+          retention-days: 14
+
           path: |
             ${{ runner.temp }}/proot-output/libproot.so
             ${{ runner.temp }}/proot-output/libproot-loader.so
