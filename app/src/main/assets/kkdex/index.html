@@ -4672,21 +4672,17 @@ const KKDex = {
         // ---- TERMINAL APP ----
         Terminal: {
             history: [],
-            historyIndex: 0,
-            cwd: '',
-            busy: false,
 
             render() {
                 return `<div class="terminal-app">
-                    <div class="terminal-output" id="terminal-output" aria-live="polite">
-                        <div class="terminal-line"><span class="output">KK DEX Terminal — Android shell</span></div>
-                        <div class="terminal-line"><span class="output">Real commands run in KK DEX's private workspace. Type 'help' to begin.</span></div>
-                        <div class="terminal-line"><span class="output">This is not root. Android restricts access to protected system files.</span></div>
+                    <div class="terminal-output" id="terminal-output">
+                        <div class="terminal-line"><span class="output">KK Dex Terminal v1.0.0</span></div>
+                        <div class="terminal-line"><span class="output">Type 'help' for available commands.</span></div>
                         <div class="terminal-line"><span class="output">&nbsp;</span></div>
                     </div>
                     <div class="terminal-input-line">
-                        <span class="terminal-prompt" id="terminal-prompt">kk-user@dex:~$</span>
-                        <input type="text" class="terminal-input" id="terminal-input" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Terminal command">
+                        <span class="terminal-prompt">kk-user@dex:~$</span>
+                        <input type="text" class="terminal-input" id="terminal-input" autofocus>
                     </div>
                 </div>`;
             },
@@ -4694,88 +4690,76 @@ const KKDex = {
             initEvents(winId) {
                 const body = document.getElementById(`window-body-${winId}`);
                 if (!body) return;
+
                 const input = body.querySelector('#terminal-input');
                 const output = body.querySelector('#terminal-output');
-                const prompt = body.querySelector('#terminal-prompt');
-                if (!input || !output || !prompt) return;
-
-                if (!this.cwd && window.KKDexHost && typeof KKDexHost.terminalHome === 'function') {
-                    this.cwd = KKDexHost.terminalHome() || '';
-                }
-                const updatePrompt = () => {
-                    const shown = this.cwd ? this.cwd.replace(/^.*\/terminal-home(?=\/|$)/, '~') : '~';
-                    prompt.textContent = `kk-user@dex:${shown}$`;
-                };
-                const append = (kind, value) => {
-                    if (!value) return;
-                    const line = document.createElement('div');
-                    line.className = 'terminal-line';
-                    const span = document.createElement('span');
-                    span.className = kind;
-                    span.textContent = String(value);
-                    line.appendChild(span);
-                    output.appendChild(line);
-                    output.scrollTop = output.scrollHeight;
-                };
-                const run = (raw) => {
-                    const cmd = raw.trim();
-                    if (!cmd || this.busy) return;
-                    append('prompt', prompt.textContent + ' ');
-                    append('command', cmd);
-                    input.value = '';
-                    this.history.push(cmd);
-                    this.historyIndex = this.history.length;
-                    if (cmd === 'clear') { output.replaceChildren(); return; }
-                    if (cmd === 'help') {
-                        append('output', 'Real Android shell commands: pwd, ls, mkdir, cd, touch, cat, echo, cp, mv, rm, date, whoami, uname, env, df, ps, id, chmod, grep, find, head, tail, clear, exit.');
-                        append('output', 'Python, Node.js, Git and package managers are not bundled yet. A proper Linux userspace runtime is a separate next stage.');
-                        return;
-                    }
-                    if (cmd === 'exit') { append('output', 'Terminal session remains open. Close the app window to leave the terminal.'); return; }
-                    if (cmd === 'cd' || cmd.startsWith('cd ')) {
-                        const target = cmd.length > 2 ? cmd.slice(3).trim().replace(/^(['"])(.*)\1$/, '$2') : this.cwd;
-                        try {
-                            const result = JSON.parse(KKDexHost.terminalChangeDirectory(this.cwd, target || this.cwd));
-                            if (result.ok) this.cwd = result.cwd;
-                            else append('error', result.error || 'cd failed');
-                        } catch (e) { append('error', e.message || 'cd failed'); }
-                        updatePrompt();
-                        return;
-                    }
-                    if (!window.KKDexHost || typeof KKDexHost.terminalExecute !== 'function') {
-                        append('error', 'Native terminal runtime is unavailable. Open KK DEX on the TV desktop display.');
-                        return;
-                    }
-                    this.busy = true;
-                    input.disabled = true;
-                    try {
-                        const result = JSON.parse(KKDexHost.terminalExecute(cmd, this.cwd));
-                        if (result.stdout) append('output', result.stdout);
-                        if (result.stderr) append('error', result.stderr);
-                        if (result.exitCode !== 0 && !result.stdout && !result.stderr) append('error', `Command failed with exit code ${result.exitCode}`);
-                        if (result.timedOut) append('error', 'Command timed out.');
-                    } catch (e) {
-                        append('error', e.message || 'Could not execute command.');
-                    } finally {
-                        this.busy = false;
-                        input.disabled = false;
-                        input.focus();
-                    }
-                };
 
                 input.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') { e.preventDefault(); run(input.value); }
-                    else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        if (this.historyIndex > 0) input.value = this.history[--this.historyIndex];
-                    } else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        if (this.historyIndex < this.history.length - 1) input.value = this.history[++this.historyIndex];
-                        else { this.historyIndex = this.history.length; input.value = ''; }
+                    if (e.key === 'Enter') {
+                        const cmd = input.value.trim();
+                        if (!cmd) return;
+
+                        // Show command
+                        output.innerHTML += `<div class="terminal-line"><span class="prompt">kk-user@dex:~$ </span><span class="command">${cmd}</span></div>`;
+
+                        // Process command
+                        const result = this.processCommand(cmd);
+                        if (result) {
+                            output.innerHTML += `<div class="terminal-line"><span class="${result.type || 'output'}">${result.text}</span></div>`;
+                        }
+
+                        input.value = '';
+                        output.scrollTop = output.scrollHeight;
+                        this.history.push(cmd);
                     }
                 });
-                updatePrompt();
+
                 input.focus();
+            },
+
+            processCommand(cmd) {
+                const parts = cmd.toLowerCase().split(' ');
+                const command = parts[0];
+
+                switch(command) {
+                    case 'help':
+                        return { text: 'Available commands: help, echo, date, clear, whoami, uname, ls, pwd, neofetch, theme, version', type: 'output' };
+                    case 'echo':
+                        return { text: parts.slice(1).join(' '), type: 'output' };
+                    case 'date':
+                        return { text: new Date().toString(), type: 'output' };
+                    case 'whoami':
+                        return { text: 'kk-user', type: 'output' };
+                    case 'uname':
+                        return { text: 'KK Dex 1.0.0 (Desktop Environment)', type: 'output' };
+                    case 'pwd':
+                        return { text: '/home/kk-user', type: 'output' };
+                    case 'ls':
+                        return { text: 'Documents  Downloads  Pictures  Music  Videos  Desktop', type: 'output' };
+                    case 'clear':
+                        const output = document.querySelector('#terminal-output');
+                        if (output) output.innerHTML = '';
+                        return null;
+                    case 'version':
+                        return { text: 'KK Dex Desktop Environment v1.0.0\nBuild: 2024.01.001', type: 'output' };
+                    case 'theme':
+                        if (parts[1] === 'dark') { KKDex.applyTheme('dark'); return { text: 'Theme changed to dark', type: 'output' }; }
+                        if (parts[1] === 'light') { KKDex.applyTheme('light'); return { text: 'Theme changed to light', type: 'output' }; }
+                        return { text: 'Usage: theme [dark|light]', type: 'output' };
+                    case 'neofetch':
+                        return { text: `
+  ⬡ KK Dex Desktop
+  ─────────────────
+  OS: KK Dex 1.0.0
+  Host: Web Browser
+  Resolution: ${window.innerWidth}x${window.innerHeight}
+  Theme: ${KKDex.state.theme}
+  Wallpaper: ${KKDex.state.wallpaper}
+  Windows: ${KKDex.state.windows.length}
+  Uptime: Active`, type: 'output' };
+                    default:
+                        return { text: `command not found: ${command}`, type: 'error' };
+                }
             }
         }
     },
