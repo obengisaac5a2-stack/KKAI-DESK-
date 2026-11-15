@@ -322,4 +322,77 @@ patch("tests/android-native.spec.ts",
 '''  await input.fill("printf genuine");''',
 "native terminal default command test")
 
+
+# Make the terminal usable on Android phones: explicit Run control and IME action.
+terminal_input = re.search(
+    r'<input\\b(?=[^>]*aria-label=["\\']Terminal command["\\'])[\\s\\S]*?/>',
+    s,
+)
+if not terminal_input:
+    raise SystemExit("Could not locate the unique terminal command input for the mobile keyboard fix.")
+input_tag = terminal_input.group(0)
+if 'enterKeyHint=' not in input_tag:
+    input_tag = input_tag[:-2] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} />'
+run_button = """
+      <button
+        type="button"
+        className="terminal-run-button"
+        aria-label="Run command"
+        onClick={() => {
+          const commandInput = document.querySelector<HTMLInputElement>('input[aria-label="Terminal command"]');
+          if (!commandInput) return;
+          commandInput.focus();
+          commandInput.dispatchEvent(new KeyboardEvent("keydown", {
+            key: "Enter",
+            code: "Enter",
+            bubbles: true,
+          }));
+        }}
+      >
+        Run
+      </button>"""
+s = s[:terminal_input.start()] + input_tag + run_button + s[terminal_input.end():]
+css = root / "src/index.css"
+css.write_text(css.read_text().rstrip() + """
+
+/* Development 8: reliable phone terminal controls and Android keyboard behavior. */
+.terminal-run-button {
+  min-width: 72px;
+  min-height: 46px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border, rgba(255,255,255,.18));
+  border-radius: 10px;
+  background: var(--accent, #fff);
+  color: #111;
+  font: inherit;
+  font-weight: 700;
+  padding: 0 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.terminal-run-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+input[aria-label="Terminal command"] {
+  min-width: 0;
+  min-height: 46px;
+  font-size: 16px !important;
+  touch-action: manipulation;
+}
+@media (max-width: 700px) {
+  .terminal-run-button {
+    min-width: 84px;
+    min-height: 52px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+  input[aria-label="Terminal command"] {
+    min-height: 52px;
+    padding-inline: 14px;
+  }
+}
+""")
+p.write_text(s)
+
 print("Development 8 Terminal patch applied: real Android shell is the default, cd persists, and virtual workspace commands use an explicit prefix.")
