@@ -511,6 +511,12 @@ jobs:
           print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
           PY
 
+      - name: Activate the real Development 8 terminal runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/patch-development-8-terminal.py" "$PROJECT_ROOT"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
