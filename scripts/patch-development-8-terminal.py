@@ -159,10 +159,6 @@ s, legacy_count = legacy_shell_print.subn(
     s,
 )
 print(f"Updated {legacy_count} remaining legacy shell-output call(s).")
-print("Terminal TypeScript diagnostic context:")
-for line_number, line in enumerate(p.read_text().splitlines(), 1):
-    if 750 <= line_number <= 785:
-        print(f"{line_number}: {line}")
 
 controller = root / "android/app/src/main/java/com/kkdex/desktop/TerminalController.kt"
 source = controller.read_text()
@@ -368,6 +364,10 @@ run_button = """
         Run
       </button>"""
 s = s[:input_start] + input_tag + run_button + s[input_end:]
+# Keep command arguments and rendered shell output explicitly textual at TS boundaries.
+s = s.replace("window.KKDexServices.execute(argument)", "window.KKDexServices.execute(String(argument))")
+s = s.replace("window.KKDexServices.execute(raw)", "window.KKDexServices.execute(String(raw))")
+s = s.replace("print(result.output,", "print(String(result.output),")
 css = root / "src/index.css"
 css.write_text(css.read_text().rstrip() + """
 
