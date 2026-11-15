@@ -325,7 +325,7 @@ patch("tests/android-native.spec.ts",
 
 # Make the terminal usable on Android phones: explicit Run control and IME action.
 terminal_input = re.search(
-    r'<input\\b(?=[^>]*aria-label=["\\']Terminal command["\\'])[\\s\\S]*?/>',
+    r"""<input\\b(?=[^>]*aria-label=[\"']Terminal command[\"'])[\\s\\S]*?/>""",
     s,
 )
 if not terminal_input:
