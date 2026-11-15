@@ -375,6 +375,116 @@ jobs:
                     expect(applied).toBe("0.55");
                   });
               """))
+          # Replace the unsupported WebView Fullscreen API with a desktop-owned layout mode.
+          replace_once("src/apps/SystemApps.tsx",
+              '  const [permissionMessage, setPermissionMessage] = useState("");',
+              '''  const [permissionMessage, setPermissionMessage] = useState("");
+            const [fullscreenLayout, setFullscreenLayout] = useState(() =>
+              document.querySelector(".desktop")?.classList.contains("fullscreen-layout") ?? false,
+            );''')
+          replace_once("src/apps/SystemApps.tsx",
+              textwrap.dedent("""
+                    <button
+                      className="secondary-button"
+                      onClick={async () => {
+                        try {
+                          if (document.fullscreenElement)
+                            await document.exitFullscreen();
+                          else await document.documentElement.requestFullscreen();
+                        } catch {
+                          explain(
+                            "Full screen unavailable",
+                            "This WebView does not allow full-screen requests. The Android host can enable immersive mode for the external display.",
+                          );
+                        }
+                      }}
+                    >
+                      <Maximize size={14} />
+                      Toggle full screen
+                    </button>
+              """),
+              textwrap.dedent("""
+                    <button
+                      className="secondary-button"
+                      aria-pressed={fullscreenLayout}
+                      onClick={() => {
+                        const desktop = document.querySelector(".desktop");
+                        if (!desktop) return;
+                        const enabled = desktop.classList.toggle("fullscreen-layout");
+                        setFullscreenLayout(enabled);
+                      }}
+                    >
+                      <Maximize size={14} />
+                      {fullscreenLayout ? "Exit full screen" : "Toggle full screen"}
+                    </button>
+              """))
+          css = Path("src/index.css")
+          fullscreen_css = """
+          /* Development 8: native-safe full-screen desktop layout (no WebView Fullscreen API). */
+          .desktop.fullscreen-layout .desktop-icons {
+            inset: 0 0 48px;
+            display: flex;
+            align-content: center;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            padding: 18px 24px 22px;
+            overflow: auto;
+          }
+          .desktop.fullscreen-layout .desktop-icons .desktop-icon {
+            position: relative !important;
+            left: auto !important;
+            top: auto !important;
+            flex: 0 0 76px;
+            width: 76px;
+            height: 78px;
+            padding: 5px 2px 3px;
+          }
+          .desktop.fullscreen-layout .desktop-brand { right: 22px; bottom: 58px; }
+          .desktop.fullscreen-layout .taskbar { height: 48px; padding: 0 12px; }
+          .desktop.fullscreen-layout .taskbar-brand,
+          .desktop.fullscreen-layout .taskbar-brand-divider,
+          .desktop.fullscreen-layout .taskbar-clock { display: none; }
+          .desktop.fullscreen-layout .taskbar-center {
+            position: static;
+            transform: none;
+            margin: 0 auto;
+            gap: 5px;
+          }
+          .desktop.fullscreen-layout .taskbar-button { width: 36px; height: 36px; }
+          .desktop.fullscreen-layout .window-layer { bottom: 48px; }
+          @media (max-width: 620px) {
+            .desktop.fullscreen-layout .desktop-icons { padding-inline: 10px; gap: 4px 6px; }
+            .desktop.fullscreen-layout .desktop-icons .desktop-icon { flex-basis: 68px; width: 68px; }
+          }
+          """
+          css_source = css.read_text()
+          if "native-safe full-screen desktop layout" not in css_source:
+              css.write_text(css_source.rstrip() + "\n\n" + fullscreen_css)
+          replace_once("tests/integration.spec.ts",
+              'test("permanent deletion requires confirmation and cannot be undone", async ({',
+              '''test("full-screen desktop toggles its native-safe layout without requesting browser fullscreen", async ({
+                page,
+              }) => {
+                await launch(page, "settings");
+                await page.getByRole("button", { name: "Display", exact: true }).click();
+                await page.evaluate(() => {
+                  document.documentElement.requestFullscreen = async () => {
+                    throw new Error("WebView fullscreen must not be called");
+                  };
+                });
+                await page.getByRole("button", { name: "Toggle full screen" }).click();
+                await expect(page.locator(".desktop")).toHaveClass(/fullscreen-layout/);
+                await expect(page.getByRole("button", { name: "Exit full screen" })).toHaveAttribute("aria-pressed", "true");
+                const taskbarHeight = await page.locator(".taskbar").evaluate((el) => getComputedStyle(el).height);
+                expect(taskbarHeight).toBe("48px");
+                await page.getByRole("button", { name: "Exit full screen" }).click();
+                await expect(page.locator(".desktop")).not.toHaveClass(/fullscreen-layout/);
+              });
+
+              test("permanent deletion requires confirmation and cannot be undone", async ({''')
+          print("Replaced unsupported WebView fullscreen calls with a desktop-owned centered layout and compact taskbar.")
           print("Set Development 8 display scale to 50%, replaced the native select with a range control, and added a regression test.")
           print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
           PY
