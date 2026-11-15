@@ -2,6 +2,10 @@ name: Inspect Development 8 Linux terminal integration points
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/inspect-development-8-linux-bridge.yml"
 
 permissions:
   contents: read
