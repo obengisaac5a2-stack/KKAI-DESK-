@@ -525,6 +525,18 @@ jobs:
           set -euo pipefail
           python3 "$GITHUB_WORKSPACE/scripts/patch-development-8-terminal.py" "$PROJECT_ROOT"
 
+      - name: Build and package the pinned Android ARM64 PRoot runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "$GITHUB_WORKSPACE/scripts/linux-runtime-build/build-android-runtime.sh" "$PROJECT_ROOT"
+
+      - name: Integrate Debian PRoot into the Development 8 terminal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/scripts/patch-development-8-linux.py" "$PROJECT_ROOT" "$GITHUB_WORKSPACE/scripts/linux-runtime-build/LinuxRuntimeController.kt"
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
