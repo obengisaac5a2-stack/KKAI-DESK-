@@ -152,6 +152,14 @@ replace_once("src/apps/Productivity.tsx",
             print(result.output, result.exitCode === 0 ? "normal" : "error");''',
 "default native output")
 
+# Convert any remaining legacy direct shell print calls to the structured result's text.
+legacy_shell_print = re.compile(r'print\\(\\s*await window\\.KKDexServices\\.execute\\(([^)]*)\\)\\s*\\);')
+s, legacy_count = legacy_shell_print.subn(
+    r'print((await window.KKDexServices.execute(\\1)).output);',
+    s,
+)
+print(f"Updated {legacy_count} remaining legacy shell-output call(s).")
+
 controller = root / "android/app/src/main/java/com/kkdex/desktop/TerminalController.kt"
 source = controller.read_text()
 class_start = source.index("class TerminalController")
@@ -336,7 +344,7 @@ if input_end < 0:
 input_end += 2
 input_tag = s[input_start:input_end]
 if "enterKeyHint=" not in input_tag:
-    input_tag = input_tag[:-2] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} />'
+    input_tag = input_tag[:-2] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" />'
 run_button = """
       <button
         type="button"
