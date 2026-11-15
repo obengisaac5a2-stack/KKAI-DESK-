@@ -79,7 +79,7 @@ source = source.replace(
     'window.KKDexServices.execute("android " + String(argument))',
 )
 source = source.replace(
-    "Use workspace <command> only for KK DEX virtual workspace files.",
+    'Use "workspace <command>" only for KK DEX virtual workspace files.',
     "Use workspace <command> only for KK DEX virtual workspace files.\nRun linux install once to add Debian 13.7 ARM64. After installation, normal commands run in Debian with PRoot fake root; use android <command> for the Android app shell.\nLinux controls: linux install, linux status, linux reset.",
 )
 source = source.replace("ANDROID APP SANDBOX", "ANDROID + DEBIAN TERMINAL")
