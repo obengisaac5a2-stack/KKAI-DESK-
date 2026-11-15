@@ -32,7 +32,8 @@ source = source.replace(anchor, anchor + "\n    private val linux = LinuxRuntime
 method_anchor = "    @Synchronized\n    fun run(commandValue: String): JSONObject {"
 if source.count(method_anchor) != 1:
     raise SystemExit("Could not find the exact Development 8 Android shell method.")
-dispatcher = """    fun run(commandValue: String): JSONObject {
+dispatcher = """    @Synchronized
+    fun run(commandValue: String): JSONObject {
         val command = commandValue.trim()
         if (command.isEmpty()) throw IllegalArgumentException("No command was provided.")
         when (command.lowercase()) {
