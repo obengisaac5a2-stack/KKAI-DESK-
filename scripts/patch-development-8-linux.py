@@ -85,6 +85,11 @@ source = source.replace(
 source = source.replace("ANDROID APP SANDBOX", "ANDROID + DEBIAN TERMINAL")
 source = source.replace("Android app sandbox", "Android shell + Debian PRoot")
 source = source.replace(
+    "Use workspace <command> for KK DEX virtual files.",
+    "Use workspace <command> for KK DEX virtual files.\nLinux: linux install, linux status, linux reset. After installation, ordinary commands run in Debian; use android <command> for Android.",
+)
+source = source.replace('"kk@android:"', '"kk@terminal:"')
+source = source.replace(
     "Waiting for Android app-sandbox command...",
     "Waiting for native terminal command...",
 )
