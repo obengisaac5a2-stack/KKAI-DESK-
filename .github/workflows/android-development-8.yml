@@ -512,6 +512,7 @@ jobs:
           PY
 
       # Terminal patch script escaping corrected in the latest commit.
+      # Preserve the complete terminal routing edit before subsequent source patches.
       - name: Activate the real Development 8 terminal runtime
         shell: bash
         run: |
