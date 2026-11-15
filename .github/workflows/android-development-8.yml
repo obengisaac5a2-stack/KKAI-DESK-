@@ -8,6 +8,8 @@ on:
       - ".github/workflows/android-development-8.yml"
       - "kk-dex-desktop-os-development (8).zip"
       - "scripts/patch-development-8-terminal.py"
+      - "scripts/patch-development-8-linux.py"
+      - "scripts/linux-runtime-build/**"
 
 permissions:
   contents: read
