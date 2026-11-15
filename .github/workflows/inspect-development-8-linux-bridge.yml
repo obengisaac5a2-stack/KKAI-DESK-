@@ -1,0 +1,56 @@
+name: Inspect Development 8 Linux terminal integration points
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract exact Development 8 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/kkdex-development-8-inspect"
+          mkdir -p "$ROOT"
+          unzip -q "kk-dex-desktop-os-development (8).zip" -d "$ROOT"
+          test -s "$ROOT/package.json"
+          test -s "$ROOT/android/app/src/main/AndroidManifest.xml"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
+
+      - name: Capture native bridge and terminal integration points
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/kkdex-linux-integration-inspection"
+          mkdir -p "$OUT"
+          find "$ROOT/android/app/src/main/java" -type f -name '*.kt' -print | sort > "$OUT/kotlin-files.txt"
+          find "$ROOT/src" -type f \( -name '*.ts' -o -name '*.tsx' \) -print | sort > "$OUT/frontend-files.txt"
+          grep -RniE 'runCommand|TerminalController|NativeBridge|JavascriptInterface|addJavascriptInterface|KKDexServices|terminal command' "$ROOT/android/app/src/main/java" "$ROOT/src" > "$OUT/integration-search.txt" || true
+          while IFS= read -r file; do
+            case "$file" in
+              *NativeBridge.kt|*MainActivity.kt|*TerminalController.kt|*BrowserActivity.kt)
+                mkdir -p "$OUT/$(dirname "${file#"$ROOT"/}")"
+                cp "$file" "$OUT/${file#"$ROOT"/}"
+                ;;
+            esac
+          done < "$OUT/kotlin-files.txt"
+          cp "$ROOT/src/android/native.ts" "$OUT/native.ts" 2>/dev/null || true
+          cp "$ROOT/src/types.ts" "$OUT/types.ts" 2>/dev/null || true
+          cp "$ROOT/src/apps/Productivity.tsx" "$OUT/Productivity.tsx" 2>/dev/null || true
+          echo "Captured Development 8 source integration points."
+          sed -n '1,240p' "$OUT/integration-search.txt"
+
+      - name: Upload inspection bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-linux-integration-inspection
+          path: ${{ runner.temp }}/kkdex-linux-integration-inspection
+          if-no-files-found: error
+          retention-days: 3
