@@ -420,20 +420,24 @@ jobs:
               """), "              "))
           # Android 11+ needs an explicit insets-controller hide call; setDecorFitsSystemWindows alone does not hide system bars.
           replace_once("android/app/src/main/java/com/kkdex/desktop/DesktopPresentation.kt",
-              """            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                          setDecorFitsSystemWindows(false)
-                      } else {""",
-              """            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                          setDecorFitsSystemWindows(false)
-                          val systemBars = android.view.WindowInsets.Type.statusBars() or
-                              android.view.WindowInsets.Type.navigationBars()
-                          decorView.post {
-                              val controller = this@DesktopPresentation.window?.insetsController
-                              controller?.hide(systemBars)
-                              controller?.systemBarsBehavior =
-                                  android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                          }
-                      } else {""")
+              textwrap.indent(textwrap.dedent("""
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      setDecorFitsSystemWindows(false)
+                  } else {
+              """), "            "),
+              textwrap.indent(textwrap.dedent("""
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                      setDecorFitsSystemWindows(false)
+                      val systemBars = android.view.WindowInsets.Type.statusBars() or
+                          android.view.WindowInsets.Type.navigationBars()
+                      decorView.post {
+                          val controller = this@DesktopPresentation.window?.insetsController
+                          controller?.hide(systemBars)
+                          controller?.systemBarsBehavior =
+                              android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                      }
+                  } else {
+              """), "            "))
           css = Path("src/index.css")
           fullscreen_css = """
           /* Development 8: native-safe full-screen desktop layout (no WebView Fullscreen API). */
