@@ -91,9 +91,9 @@ help_case = '''      case "help":
           break;
         }
         if (nativeShell) {
-          print("ANDROID SHELL CONNECTED\nCommands run with /system/bin/sh as the KK DEX Android app UID. This is real execution, not root.\nTry: pwd, ls, cd, mkdir, touch, cat, cp, mv, rm, grep, find, ps, env, df, uname -a, id, whoami, python3 --version, node --version, git --version.\nThe current directory is remembered between commands. Android may restrict shared and protected storage.\nUse workspace <command> for KK DEX virtual files.");
+          print("ANDROID SHELL CONNECTED\\nCommands run with /system/bin/sh as the KK DEX Android app UID. This is real execution, not root.\\nTry: pwd, ls, cd, mkdir, touch, cat, cp, mv, rm, grep, find, ps, env, df, uname -a, id, whoami, python3 --version, node --version, git --version.\\nThe current directory is remembered between commands. Android may restrict shared and protected storage.\\nUse workspace <command> for KK DEX virtual files.");
         } else {
-          print("ANDROID SHELL NOT CONNECTED\nThis browser preview cannot execute Android commands. No command output is simulated. Install and open the KK DEX APK to use the native shell.\nUse workspace <command> for KK DEX virtual files.");
+          print("ANDROID SHELL NOT CONNECTED\\nThis browser preview cannot execute Android commands. No command output is simulated. Install and open the KK DEX APK to use the native shell.\\nUse workspace <command> for KK DEX virtual files.");
         }
         break;
 '''
@@ -124,7 +124,7 @@ ns = native.read_text()
 native_pattern = re.compile(r'      const header = .*;\n      return .*;\n')
 native_replacement = '''      const header = "[" + result.backend + (result.exitCode === 0 ? "" : " · exit " + result.exitCode) + "]";
       return {
-        output: header + "\n" + (output || "(no output)") + (result.timedOut ? "\n[Command timed out]" : ""),
+        output: header + "\\n" + (output || "(no output)") + (result.timedOut ? "\\n[Command timed out]" : ""),
         workingDirectory: result.workingDirectory,
         exitCode: result.exitCode,
         timedOut: result.timedOut,
