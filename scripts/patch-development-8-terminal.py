@@ -336,7 +336,11 @@ if not opening:
     raise SystemExit("Could not parse the terminal command field.")
 opening_tag = opening.group(0)
 if "enterKeyHint=" not in opening_tag:
-    opening_tag = opening_tag[:-1] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false}>'
+    attrs = ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false}'
+    if opening.group(1) == "input" and opening_tag.rstrip().endswith("/>"):
+        opening_tag = opening_tag.rstrip()[:-2] + attrs + " />"
+    else:
+        opening_tag = opening_tag[:-1] + attrs + ">"
     input_tag = opening_tag + input_tag[opening.end():]
 run_button = """
       <button
