@@ -325,21 +325,26 @@ patch("tests/android-native.spec.ts",
 
 # Make the terminal usable on Android phones: explicit Run control and IME action.
 terminal_input = re.search(
-    r"""<input\\b(?=[^>]*aria-label=[\"']Terminal command[\"'])[\\s\\S]*?/>""",
+    r"""<(input|textarea)\\b(?=[^>]*aria-label=["']Terminal command["'])[^>]*>(?:[\\s\\S]*?</textarea>)?""",
     s,
 )
 if not terminal_input:
-    raise SystemExit("Could not locate the unique terminal command input for the mobile keyboard fix.")
+    raise SystemExit("Could not locate the terminal command field for the mobile keyboard fix.")
 input_tag = terminal_input.group(0)
-if 'enterKeyHint=' not in input_tag:
-    input_tag = input_tag[:-2] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false} />'
+opening = re.match(r"<(input|textarea)\\b[^>]*>", input_tag)
+if not opening:
+    raise SystemExit("Could not parse the terminal command field.")
+opening_tag = opening.group(0)
+if "enterKeyHint=" not in opening_tag:
+    opening_tag = opening_tag[:-1] + ' enterKeyHint="go" inputMode="text" autoCapitalize="off" autoCorrect="off" spellCheck={false}>'
+    input_tag = opening_tag + input_tag[opening.end():]
 run_button = """
       <button
         type="button"
         className="terminal-run-button"
         aria-label="Run command"
         onClick={() => {
-          const commandInput = document.querySelector<HTMLInputElement>('input[aria-label="Terminal command"]');
+          const commandInput = document.querySelector<HTMLInputElement | HTMLTextAreaElement>('[aria-label="Terminal command"]');
           if (!commandInput) return;
           commandInput.focus();
           commandInput.dispatchEvent(new KeyboardEvent("keydown", {
@@ -374,7 +379,7 @@ css.write_text(css.read_text().rstrip() + """
   outline: 2px solid currentColor;
   outline-offset: 2px;
 }
-input[aria-label="Terminal command"] {
+[aria-label="Terminal command"] {
   min-width: 0;
   min-height: 46px;
   font-size: 16px !important;
@@ -387,7 +392,7 @@ input[aria-label="Terminal command"] {
     border-radius: 12px;
     font-size: 16px;
   }
-  input[aria-label="Terminal command"] {
+  [aria-label="Terminal command"] {
     min-height: 52px;
     padding-inline: 14px;
   }
