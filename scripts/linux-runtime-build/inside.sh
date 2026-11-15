@@ -66,7 +66,8 @@ sed -i 's/PTRACE_O_TRACEEXIT);/PTRACE_O_TRACEEXIT\t|\n\t\t\t\tPTRACE_O_EXITKILL)
 grep -q 'PTRACE_O_EXITKILL);' src/tracee/event.c
 grep -q 'define PTRACE_O_EXITKILL' src/compat.h || sed -i 's/^#    ifndef PTRACE_O_TRACESYSGOOD$/#    ifndef PTRACE_O_EXITKILL\n#        define PTRACE_O_EXITKILL\t0x00100000\n#    endif\n&/' src/compat.h
 grep -q 'define PTRACE_O_EXITKILL' src/compat.h
-LOADER_LDFLAGS="$PAGE" CPPFLAGS="-I$B/sysroot/include -DARG_MAX=131072 -DVERSION=\\\"5.1.107.96\\\"" CFLAGS="-O2 $REPRO -Wno-error=implicit-function-declaration" LDFLAGS="-L$B/sysroot/lib $PAGE -Wl,--build-id=sha1 -llog -landroid" make -s -C src proot loader/loader CC="$CC" LD="$CC" STRIP="$STRIP" OBJCOPY="$OBJCOPY" PROOT_WITH_LIBANDROID_SHMEM=true PROOT_UNBUNDLE_LOADER=/nonexistent-use-PROOT_LOADER HAS_LOADER_32BIT= 2>&1 | grep -iE "error|undefined|not found|No such" | grep -v "rpc/rpc.h" | head -20 || true
+LOADER_LDFLAGS="$PAGE" CPPFLAGS="-I$B/sysroot/include -DARG_MAX=131072 -DVERSION=\\\"5.1.107.96\\\"" CFLAGS="-O2 $REPRO -Wno-error=implicit-function-declaration" LDFLAGS="-L$B/sysroot/lib $PAGE -Wl,--build-id=sha1 -llog -landroid" make -s -C src proot loader/loader CC="$CC" LD="$CC" STRIP="$STRIP" OBJCOPY="$OBJCOPY" PROOT_WITH_LIBANDROID_SHMEM=true PROOT_UNBUNDLE_LOADER=/nonexistent-use-PROOT_LOADER HAS_LOADER_32BIT= > "$B/proot-build.log" 2>&1 || { cat "$B/proot-build.log"; exit 1; }
+grep -iE "error|undefined|not found|No such" "$B/proot-build.log" | grep -v "rpc/rpc.h" | head -20 || true
 cd "$B"
 cp proot-5.1.107.96/src/proot libproot.so
 cp proot-5.1.107.96/src/loader/loader libproot-loader.so
