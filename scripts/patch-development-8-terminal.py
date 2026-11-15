@@ -58,13 +58,14 @@ if s.count(old) != 1:
     raise SystemExit("Default native shell routing anchor was not unique.")
 s = s.replace(old, new, 1)
 
-replace_once("src/apps/Productivity.tsx",
-'''  const [cwd, setCwd] = useState("documents");
-  const [history, setHistory''',
-'''  const [cwd, setCwd] = useState("documents");
+old_cwd = '''  const [cwd, setCwd] = useState("documents");
+  const [history, setHistory'''
+new_cwd = '''  const [cwd, setCwd] = useState("documents");
   const [nativeCwd, setNativeCwd] = useState("");
-  const [history, setHistory''',
-"native cwd state")
+  const [history, setHistory'''
+if s.count(old_cwd) != 1:
+    raise SystemExit("Could not locate native cwd state anchor.")
+s = s.replace(old_cwd, new_cwd, 1)
 
 prompt_pattern = re.compile(r'  const prompt = .*;\n')
 prompt_new = '''  const prompt = nativeShell
@@ -75,11 +76,12 @@ s, count = prompt_pattern.subn(prompt_new, s, count=1)
 if count != 1:
     raise SystemExit("Could not update the terminal prompt.")
 
-old_intro = '''        ? 'KK DEX Terminal 1.1\\nAndroid application shell connected. Commands run as this app inside its Android sandbox, not as root.\\nPython, Node, Git and other tools are available only if their executable is genuinely installed.\\nWorkspace commands such as ls, cd, mkdir and open refer to the local KK DEX workspace. Use "shell <command>" or "native <command>" for the Android sandbox.\\nType "help" to get started.'
-        : 'KK DEX Workspace Shell 1.0\\nA real command interface for the local persistent workspace.\\nAndroid shell execution is not connected in this environment; no command will be simulated as system access.\\nType "help" to get started.', '''
-new_intro = '''        ? 'KK DEX Terminal 1.2\\nAndroid application shell connected. Commands execute on Android as the KK DEX app, not as root.\\nThe current directory is remembered between commands. Python, Node, Git and package managers work only when genuinely installed.\\nUse "workspace <command>" only for KK DEX virtual workspace files.\\nType "help" to get started.'
-        : 'KK DEX Terminal 1.2\\nAndroid shell is not connected in this browser preview. Commands are never simulated.\\nUse "workspace <command>" to explore the KK DEX virtual workspace, or install and open the Android APK for real shell execution.\\nType "help" to get started.', '''
-replace_once("src/apps/Productivity.tsx", old_intro, new_intro, "terminal introduction")
+intro_start = s.index("      text: nativeShell")
+intro_end = s.index(',\n      kind: "accent"', intro_start)
+intro_block = '''      text: nativeShell
+        ? 'KK DEX Terminal 1.2\\nAndroid application shell connected. Commands execute on Android as the KK DEX app, not as root.\\nThe current directory is remembered between commands. Python, Node, Git and package managers work only when genuinely installed.\\nUse "workspace <command>" only for KK DEX virtual workspace files.\\nType "help" to get started.'
+        : 'KK DEX Terminal 1.2\\nAndroid shell is not connected in this browser preview. Commands are never simulated.\\nUse "workspace <command>" to explore the KK DEX virtual workspace, or install and open the Android APK for real shell execution.\\nType "help" to get started.' '''
+s = s[:intro_start] + intro_block + s[intro_end:]
 
 start = s.index('      case "help":')
 end = s.index('      case "clear":', start)
