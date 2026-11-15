@@ -511,6 +511,7 @@ jobs:
           print("Applied compact TV layout, smaller defaults, and restored-window bounds.")
           PY
 
+      # Terminal patch script escaping corrected in the latest commit.
       - name: Activate the real Development 8 terminal runtime
         shell: bash
         run: |
