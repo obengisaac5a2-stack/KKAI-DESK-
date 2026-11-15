@@ -127,7 +127,7 @@ ns = native.read_text()
 native_pattern = re.compile(r'      const header = .*;\n      return .*;\n')
 native_replacement = '''      const header = "[" + result.backend + (result.exitCode === 0 ? "" : " · exit " + result.exitCode) + "]";
       return {
-        output: header + "\\n" + (output || "(no output)") + (result.timedOut ? "\\n[Command timed out]" : ""),
+        output: [header, output || "(no output)", result.timedOut ? "[Command timed out]" : ""].filter(Boolean).join(String.fromCharCode(10)),
         workingDirectory: result.workingDirectory,
         exitCode: result.exitCode,
         timedOut: result.timedOut,
