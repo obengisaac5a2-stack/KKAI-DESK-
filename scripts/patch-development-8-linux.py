@@ -23,11 +23,11 @@ gradle = root / "android/app/build.gradle.kts"
 gradle_source = gradle.read_text()
 dependency = '    implementation("org.apache.commons:commons-compress:1.27.1")'
 if dependency not in gradle_source:
-    match = re.search(r"(?m)^dependencies\\s*\\{", gradle_source)
+    match = re.search(r"(?m)^dependencies\s*\{", gradle_source)
     if not match:
         raise SystemExit("Could not find the Android Gradle dependencies block for the Debian tar extractor.")
     insert_at = match.end()
-    gradle_source = gradle_source[:insert_at] + "\\n" + dependency + gradle_source[insert_at:]
+    gradle_source = gradle_source[:insert_at] + "\n" + dependency + gradle_source[insert_at:]
     gradle.write_text(gradle_source)
 
 # Add the Debian/PRoot controller as a native Android source file.
