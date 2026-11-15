@@ -1,0 +1,43 @@
+name: Inspect Development 8 native Linux integration points
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/inspect-development-8-native-sources.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract exact Development 8 archive and collect native integration files
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/kkdex-dev8"
+          mkdir -p "$ROOT" "$RUNNER_TEMP/native-inspection"
+          unzip -q "kk-dex-desktop-os-development (8).zip" -d "$ROOT"
+          OUT="$RUNNER_TEMP/native-inspection"
+          cp "$ROOT/android/app/build.gradle.kts" "$OUT/"
+          cp "$ROOT/android/app/src/main/AndroidManifest.xml" "$OUT/"
+          cp "$ROOT/android/app/src/main/java/com/kkdex/desktop/"{MainActivity.kt,NativeBridge.kt,TerminalController.kt} "$OUT/"
+          cp "$ROOT/android/app/src/main/java/com/kkdex/desktop/"{StorageController.kt,AndroidAppLauncher.kt} "$OUT/"
+          cp "$ROOT/src/android/native.ts" "$OUT/"
+          cp "$ROOT/src/types.ts" "$OUT/"
+          cp "$ROOT/src/apps/Productivity.tsx" "$OUT/"
+          cp "$ROOT/gradle/libs.versions.toml" "$OUT/" 2>/dev/null || true
+          find "$OUT" -type f -maxdepth 1 -printf '%f %s bytes\n' | sort
+          (cd "$OUT" && sha256sum *)
+          cd "$RUNNER_TEMP"
+          zip -qr KK-DEX-development-8-native-sources.zip native-inspection
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KK-DEX-development-8-native-sources
+          path: ${{ runner.temp }}/KK-DEX-development-8-native-sources.zip
+          if-no-files-found: error
+          retention-days: 7
