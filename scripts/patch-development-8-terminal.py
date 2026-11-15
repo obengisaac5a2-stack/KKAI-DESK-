@@ -153,9 +153,9 @@ replace_once("src/apps/Productivity.tsx",
 "default native output")
 
 # Convert any remaining legacy direct shell print calls to the structured result's text.
-legacy_shell_print = re.compile(r'print\\(\\s*await window\\.KKDexServices\\.execute\\(([^)]*)\\)\\s*\\);')
+legacy_shell_print = re.compile("print\\\\(\\\\s*await window\\\\.KKDexServices\\\\.execute\\\\(([^)]*)\\\\)\\\\s*\\\\);")
 s, legacy_count = legacy_shell_print.subn(
-    r'print((await window.KKDexServices.execute(\\1)).output);',
+    lambda match: "print((await window.KKDexServices.execute(" + match.group(1) + ")).output);",
     s,
 )
 print(f"Updated {legacy_count} remaining legacy shell-output call(s).")
