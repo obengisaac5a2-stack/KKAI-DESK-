@@ -1,0 +1,8 @@
+# Verified from debuerreotype/docker-debian-artifacts commit
+# 3b26c3995c7fae47d95ba678632a3520e97054f7 (2026-11-04).
+# Debian stable 13.7 (Trixie), slim OCI ARM64/v8 rootfs layer.
+DEBIAN_ROOTFS_URL=https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/3b26c3995c7fae47d95ba678632a3520e97054f7/stable/slim/oci/blobs/rootfs.tar.gz
+DEBIAN_ROOTFS_SHA256=55da9c092deae2c7b4e2e44fe06074eef1783b000b69f2ed020d776db5358b32
+DEBIAN_ROOTFS_BYTES=30214040
+DEBIAN_ROOTFS_ARCH=arm64
+DEBIAN_ROOTFS_RELEASE=13.7
