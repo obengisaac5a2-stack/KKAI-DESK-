@@ -121,23 +121,6 @@ class MainActivity : Activity(), DisplayManager.DisplayListener {
     }
 
     private inner class HostBridge(private val role: String) {
-        private val terminalRuntime by lazy { TerminalRuntime(this@MainActivity) }
-
-        @JavascriptInterface
-        fun terminalHome(): String = if (role == "desktop") terminalRuntime.homePath() else ""
-
-        @JavascriptInterface
-        fun terminalChangeDirectory(currentPath: String, requestedPath: String): String {
-            if (role != "desktop") return JSONObject().put("ok", false).put("error", "Terminal is available on the desktop display.").toString()
-            return terminalRuntime.changeDirectory(currentPath, requestedPath)
-        }
-
-        @JavascriptInterface
-        fun terminalExecute(command: String, workingDirectory: String): String {
-            if (role != "desktop") return JSONObject().put("ok", false).put("stderr", "Terminal is available on the desktop display.").put("exitCode", 126).toString()
-            return terminalRuntime.execute(command, workingDirectory)
-        }
-
         @JavascriptInterface
         fun getInstalledApps(): String {
             val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
